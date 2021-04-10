@@ -11,10 +11,14 @@ As a consequence, I intend to make of a simple bot for helping me around with th
 
 My very short term goal is to have a basic translator that feeds me with random words from a list on Discord.
 As mid-term, I will go for convenience features, notably:
--a control-C control-V interface feeding my system with text I stumble upon
--some statistics for highlighting how many words I learned, what topics I know
--some optimization on what vocabulary to learn next, based on the words I hit the most frequently; on text I want to be able of going through; on text networks for learning paired words
--some convenience features, notably for being read the text and basic voice commands
+
+*a control-C control-V interface feeding my system with text I stumble upon
+
+*some statistics for highlighting how many words I learned, what topics I know
+
+*some optimization on what vocabulary to learn next, based on the words I hit the most frequently; on text I want to be able of going through; on text networks for learning paired words
+
+*some convenience features, notably for being read the text and basic voice commands
 
 As a matter of community service, I must say that my time is way too limited for developing tailored features. Though, if you see a use for you in my software and/or if you have constructive comments, I will be happy to hear about them and maybe help. Possibly at some point I may develop a tutorial or a multi-user version. If you want to make some extension, you are welcome to contribute, but be ready to operate independently.
 
