@@ -18,7 +18,8 @@ public class OrdforrAId extends ListenerAdapter {
 				event.getChannel().sendMessage(info.build()).queue();*/
 				//info.clear();
 				
-				event.getChannel().sendMessage("ack").queue();
+				event.getChannel().sendMessage("this is some text with some **bold** new words to learn about and some "+
+						"||translation + types of text||").queue();
 			}
 		}
 	}
