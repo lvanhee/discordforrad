@@ -1,13 +1,17 @@
 package discordforrad;
 
+import java.io.IOException;
+
 import net.dv8tion.jda.api.events.message.guild.GuildMessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 
-public class OrdforrAId extends ListenerAdapter {
+public class OrdforrAIListener extends ListenerAdapter {
+		
+	
 		public void onGuildMessageReceived(GuildMessageReceivedEvent event) {
-			String[] args = event.getMessage().getContentRaw().split("\\s+");
-			
-			if (args[0].equalsIgnoreCase("test")) {
+						
+			if (event.getMessage().getContentRaw().equalsIgnoreCase("y")) {
+				System.out.println(event.getChannel());
 				/*EmbedBuilder info = new EmbedBuilder();
 				info.setTitle("Television");
 				info.setDescription("Completely useless information about a useless bot called 'Television'.");
@@ -17,9 +21,11 @@ public class OrdforrAId extends ListenerAdapter {
 				event.getChannel().sendTyping().queue();
 				event.getChannel().sendMessage(info.build()).queue();*/
 				//info.clear();
-				
-				event.getChannel().sendMessage("this is some text with some **bold** new words to learn about and some "+
-						"||translation + types of text||").queue();
+				try {
+					DisOrdforrAId.confirm();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
 			}
 		}
 	}
