@@ -6,6 +6,9 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.util.Arrays;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 public class Translator {
 	
@@ -35,11 +38,18 @@ public class Translator {
         in.close();
         String res = response.toString();
         res = res.replaceAll("Ã¤", "ä");
+        res = res.replaceAll("Ã¶", "ö");
+        res = res.replaceAll("Ã¥", "å");
+        res = res.replaceAll("Ã–", "ö");
         return res;
     }
 
-	public static String getTranslation(String word) throws IOException {
-		return translate(SWEDISH_CODE, ENGLISH_CODE,word);
+	public static Set<String> getTranslation(String word, LanguageCode code, LanguageCode translateTo) {
+		try {
+			return Arrays.asList(translate(code.toString().toLowerCase(), translateTo.toString().toLowerCase(),word)).stream().collect(Collectors.toSet());
+		} catch (IOException e) {
+			e.printStackTrace();
+			throw new Error();
+		}
 	}
-
 }
