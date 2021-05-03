@@ -14,13 +14,17 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
+import discordforrad.languageModel.Dictionnary;
+import discordforrad.languageModel.LanguageText;
+import discordforrad.languageModel.LanguageWord;
+
 public class VocabularyLearningStatus {
 	private static final Path FILEPATH = Paths.get("data/learned_words.txt");
 	private static final Path RECORD_FILEPATH = Paths.get("data/raw_text_database.txt");
 	private static final int MAX_LEARNED = 10;
 	private final Map<LanguageWord, Integer> successfulLearningPerWord;
 	private final Map<LanguageWord, LocalDateTime> timeLastAttempt;
-	private final Set<LanguageText> rawTextDatabase ;
+	private final Set<String> rawTextDatabase ;
 	
 	
 	public VocabularyLearningStatus(
@@ -61,29 +65,34 @@ public class VocabularyLearningStatus {
 	}
 
 
-	public void addFreeString(LanguageText lt, AddStringResultContext c, boolean isOriginalString) {
-		String rawText = clearOfSymbols(lt.getText());
+	public void addFreeString(String lt, AddStringResultContext c, boolean isOriginalString) {
+		String rawText = clearOfSymbols(lt);
 
 		while(rawText.startsWith(" "))rawText = rawText.substring(1);
-		
+
 		if(!isOriginalString) rawText = rawText.replaceAll(" ", "_");
 		for(String word : rawText.split(" "))
-		{
-			if(word.isEmpty())continue;
-			LanguageWord lw = new LanguageWord(lt.getLanguageCode(), word);
-			if(!successfulLearningPerWord.containsKey(lw))
+			for(LanguageCode lc: LanguageCode.values())
 			{
-				c.addResult(lw);
-				successfulLearningPerWord.put(lw, 0);
-				timeLastAttempt.put(lw, LocalDateTime.MIN);
-				
-				for(String translation: Translator.getTranslation(word.replaceAll("_", " "), lt.getLanguageCode(), LanguageCode.otherLanguage(lt.getLanguageCode())))
-				addFreeString(
-						new LanguageText(
-								translation,
-										LanguageCode.otherLanguage(lt.getLanguageCode())),c, false);
+				if(word.isEmpty())continue;
+				LanguageWord lw = new LanguageWord(lc, word);
+
+				if(!Dictionnary.isInDictionnaries(lw))
+					continue;
+
+				if(!successfulLearningPerWord.containsKey(lw))
+				{
+					c.addResult(lw);
+					successfulLearningPerWord.put(lw, 0);
+					timeLastAttempt.put(lw, LocalDateTime.MIN);
+
+					for(String translation: Translator.getTranslation(word.replaceAll("_", " "), 
+							lc, LanguageCode.otherLanguage(lc)))
+						addFreeString(
+										translation,
+										c, false);
+				}
 			}
-		}
 
 		if(isOriginalString)
 			try {
@@ -96,19 +105,18 @@ public class VocabularyLearningStatus {
 			}
 	}
 
-	private void addToRawTextDatabase(LanguageText lt) {
-		String string = lt.getText();
+	private void addToRawTextDatabase(String string) {
 		while(string.startsWith("\n"))
 			string = string.substring(1);
-		rawTextDatabase.add(new LanguageText(string, lt.getLanguageCode()));
+		rawTextDatabase.add(string);
 		updateRawTextDatabase();
 	}
 
 
 	private void updateRawTextDatabase() {
 		String res = "";
-		for(LanguageText s:rawTextDatabase)
-			res+=s.getLanguageCode()+"|"+s.getText().replaceAll("|","")+"|\n";
+		for(String s:rawTextDatabase)
+			res+=s.replaceAll("|","")+"|\n";
 		try {
 			Files.writeString(RECORD_FILEPATH, res,Charset.forName("ISO-8859-1"));
 		} catch (IOException e) {
@@ -159,6 +167,10 @@ public class VocabularyLearningStatus {
 		string = string.replaceAll("\\)", " ");
 		string = string.replaceAll("\\]", " ");
 		string = string.replaceAll("\\[", " ");
+		string = string.replaceAll("!", " ");
+		string = string.replaceAll("\\|", " ");
+		string = string.replaceAll(":", " ");
+		string = string.replaceAll("\\?", " ");
 		string = string.toLowerCase();
 		string = string.replaceAll("\n", " ");
 		string = string.replaceAll("[0-9]", "");

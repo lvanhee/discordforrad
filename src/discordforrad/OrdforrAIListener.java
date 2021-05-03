@@ -2,6 +2,7 @@ package discordforrad;
 
 import java.io.IOException;
 
+import discordforrad.languageModel.LanguageText;
 import net.dv8tion.jda.api.events.message.guild.GuildMessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 
@@ -31,11 +32,10 @@ public class OrdforrAIListener extends ListenerAdapter {
 					String message = event.getMessage().getContentRaw();
 					String messageStart = message.substring(0,2); 
 					try {
-						LanguageCode lc = LanguageCode.valueOf(messageStart);
 						AddStringResultContext c = new AddStringResultContext(
 								x->event.getChannel().sendMessage("Adding "+ x).queue()
 								);
-						DisOrdforrAI.INSTANCE.addFreeString(new LanguageText(message.substring(2),lc),c);
+						DisOrdforrAI.INSTANCE.addFreeString(message,c);
 						event.getChannel().sendMessage("Added "+ c.getWords().size()+" words: "+c.getWords() ).queue();
 						return;
 					}

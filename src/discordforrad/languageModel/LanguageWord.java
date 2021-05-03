@@ -1,4 +1,6 @@
-package discordforrad;
+package discordforrad.languageModel;
+
+import discordforrad.LanguageCode;
 
 public class LanguageWord {
 	private final LanguageCode lc;

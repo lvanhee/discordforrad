@@ -9,6 +9,8 @@ import java.util.Random;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import discordforrad.languageModel.LanguageText;
+import discordforrad.languageModel.LanguageWord;
 import discordforrad.learningModel.LearningModel;
 
 public enum DisOrdforrAI {
@@ -61,7 +63,6 @@ public enum DisOrdforrAI {
 	}
 
 	public void displayStatistics() {
-		
 		int vocabularySize = vls.getAllWords().size();
 		int shortTerm = vls.getAllShortTermWords().size();
 		int midTerm = vls.getAllMidTermWords().size();
@@ -75,9 +76,7 @@ public enum DisOrdforrAI {
 
 	public void confirm() throws IOException {
 		if(lastWordAsked!=null)
-		{
 			vls.incrementSuccess(lastWordAsked);
-		}
 		askForNextWord();		
 		
 	}
@@ -93,7 +92,7 @@ public enum DisOrdforrAI {
 	}
 
 
-	public void addFreeString(LanguageText languageText, AddStringResultContext c) {
+	public void addFreeString(String languageText, AddStringResultContext c) {
 		vls.addFreeString(languageText,c, true);
 		askForNextWord();
 	}
@@ -125,7 +124,7 @@ public enum DisOrdforrAI {
 			shortTermWordsToTeachInThisSession.add(allShortTermWordsReadyToBeAsked.get(index));
 			allShortTermWordsReadyToBeAsked.remove(index);
 		}
-		
+		allMidTermWordsReadyToBeAsked.removeAll(shortTermWordsToTeachInThisSession);
 		midTermWordsToTeachInThisSession.clear();
 		for(int i = 0 ; i < 10 ; i++)
 		{

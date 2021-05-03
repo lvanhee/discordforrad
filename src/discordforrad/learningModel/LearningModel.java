@@ -5,8 +5,8 @@ import java.time.LocalDateTime;
 import java.time.temporal.TemporalAmount;
 import java.util.stream.Collectors;
 
-import discordforrad.LanguageWord;
 import discordforrad.VocabularyLearningStatus;
+import discordforrad.languageModel.LanguageWord;
 
 public class LearningModel {
 

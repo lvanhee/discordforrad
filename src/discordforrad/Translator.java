@@ -10,6 +10,8 @@ import java.util.Arrays;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import discordforrad.inputUtils.SpecialCharacterManager;
+
 public class Translator {
 	
 	private static final String ENGLISH_CODE = "en";
@@ -37,10 +39,7 @@ public class Translator {
         }
         in.close();
         String res = response.toString();
-        res = res.replaceAll("Ã¤", "ä");
-        res = res.replaceAll("Ã¶", "ö");
-        res = res.replaceAll("Ã¥", "å");
-        res = res.replaceAll("Ã–", "ö");
+        res = SpecialCharacterManager.Utf8ToIso(res);
         return res;
     }
 

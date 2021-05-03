@@ -1,4 +1,4 @@
-package discordforrad;
+package discordforrad.languageModel;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
@@ -6,6 +6,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Set;
+
+import discordforrad.LanguageCode;
 
 
 public class LanguageText {
@@ -20,8 +22,8 @@ public class LanguageText {
 	
 	public String toString() {return lc+"|"+text;}
 
-	public static Set<LanguageText> parse(Path recordFilepath) {
-		Set<LanguageText> res = new HashSet<>();
+	public static Set<String> parse(Path recordFilepath) {
+		Set<String> res = new HashSet<>();
 
 		try {
 			String[] input = Files.readString(recordFilepath,Charset.forName("ISO-8859-1")).split("\\|\n");
@@ -29,9 +31,7 @@ public class LanguageText {
 			for(String s:input)
 			{
 				if(s.isEmpty())continue;
-				LanguageCode lc = LanguageCode.valueOf(s.substring(0,s.indexOf("|")));
-				String txt = s.substring(s.indexOf("|")+1);
-				res.add(new LanguageText(txt, lc));
+				res.add(s);
 			}
 		} catch (IOException e) {
 			e.printStackTrace();
