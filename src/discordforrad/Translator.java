@@ -10,7 +10,7 @@ import java.util.Arrays;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import discordforrad.inputUtils.SpecialCharacterManager;
+import discordforrad.inputUtils.TextInputUtils;
 
 public class Translator {
 	
@@ -39,8 +39,8 @@ public class Translator {
         }
         in.close();
         String res = response.toString();
-        res = SpecialCharacterManager.Utf8ToIso(res);
-        return res;
+        res = TextInputUtils.Utf8ToIso(res);
+        return res.toLowerCase();
     }
 
 	public static Set<String> getTranslation(String word, LanguageCode code, LanguageCode translateTo) {

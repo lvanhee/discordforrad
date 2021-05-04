@@ -22,23 +22,6 @@ public class LanguageText {
 	
 	public String toString() {return lc+"|"+text;}
 
-	public static Set<String> parse(Path recordFilepath) {
-		Set<String> res = new HashSet<>();
-
-		try {
-			String[] input = Files.readString(recordFilepath,Charset.forName("ISO-8859-1")).split("\\|\n");
-
-			for(String s:input)
-			{
-				if(s.isEmpty())continue;
-				res.add(s);
-			}
-		} catch (IOException e) {
-			e.printStackTrace();
-			throw new Error();
-		}
-		return res;
-	}
 
 	public LanguageCode getLanguageCode() {
 		return lc;
@@ -50,5 +33,9 @@ public class LanguageText {
 	
 	public boolean equals(Object o) {return o.toString().equals(toString());};
 	public int hashCode() {return text.hashCode()+lc.hashCode();}
+
+	public static LanguageText newInstance(LanguageCode lc, String text) {
+		return new LanguageText(text, lc);
+	}
 	
 }

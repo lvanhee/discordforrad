@@ -1,4 +1,4 @@
-package discordforrad;
+package discordforrad.models;
 
 import java.io.IOException;
 import java.net.URLEncoder;
@@ -9,40 +9,42 @@ import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
+import discordforrad.AddStringResultContext;
+import discordforrad.LanguageCode;
+import discordforrad.Translator;
+import discordforrad.inputUtils.TextInputUtils;
 import discordforrad.languageModel.Dictionnary;
 import discordforrad.languageModel.LanguageText;
 import discordforrad.languageModel.LanguageWord;
 
 public class VocabularyLearningStatus {
 	private static final Path FILEPATH = Paths.get("data/learned_words.txt");
-	private static final Path RECORD_FILEPATH = Paths.get("data/raw_text_database.txt");
 	private static final int MAX_LEARNED = 10;
+	private static final int SHORT_TERM_NUMBER_OF_REPEAT = 1;
+	private static final int MID_TERM_NUMBER_OF_REPEAT = 7;
 	private final Map<LanguageWord, Integer> successfulLearningPerWord;
 	private final Map<LanguageWord, LocalDateTime> timeLastAttempt;
-	private final Set<String> rawTextDatabase ;
-	
-	
+
+
 	public VocabularyLearningStatus(
 			Map<LanguageWord, Integer> m, 
 			Map<LanguageWord, LocalDateTime> m2)
 	{
 		this.successfulLearningPerWord = m;
 		this.timeLastAttempt = m2;
-		
-		rawTextDatabase = LanguageText.parse(RECORD_FILEPATH);
-		
 	}
 
 
 	public static VocabularyLearningStatus loadFromFile() throws IOException {
 		Map<LanguageWord, Integer> m = new HashMap<>();
 		Map<LanguageWord, LocalDateTime> m2 = new HashMap<>();
-		
+
 		Charset cs = Charset.forName("ISO-8859-1");
 		for(String line: Files.lines(FILEPATH,cs).collect(Collectors.toSet()))
 		{
@@ -66,59 +68,52 @@ public class VocabularyLearningStatus {
 
 
 	public void addFreeString(String lt, AddStringResultContext c, boolean isOriginalString) {
-		String rawText = clearOfSymbols(lt);
+		Set<String> consideredWords = new HashSet<>();
+		if(!isOriginalString) consideredWords.add(lt);
+		else consideredWords = TextInputUtils.toListOfWords(lt).stream().collect(Collectors.toSet());
 
-		while(rawText.startsWith(" "))rawText = rawText.substring(1);
+		Set<LanguageWord> wordsToSearch = new HashSet<>();
 
-		if(!isOriginalString) rawText = rawText.replaceAll(" ", "_");
-		for(String word : rawText.split(" "))
+		for(String word : consideredWords)
 			for(LanguageCode lc: LanguageCode.values())
-			{
-				if(word.isEmpty())continue;
-				LanguageWord lw = new LanguageWord(lc, word);
+				if(!word.isEmpty())
+					wordsToSearch.add(new LanguageWord(lc, word));
 
-				if(!Dictionnary.isInDictionnaries(lw))
-					continue;
+		wordsToSearch.stream().filter(x->!successfulLearningPerWord.containsKey(x))
+		.forEach(lw ->
+		{
+			if(successfulLearningPerWord.containsKey(lw))return;
 
-				if(!successfulLearningPerWord.containsKey(lw))
-				{
-					c.addResult(lw);
-					successfulLearningPerWord.put(lw, 0);
-					timeLastAttempt.put(lw, LocalDateTime.MIN);
+			if(!Dictionnary.isInDictionnaries(lw))
+				return;
 
-					for(String translation: Translator.getTranslation(word.replaceAll("_", " "), 
-							lc, LanguageCode.otherLanguage(lc)))
-						addFreeString(
-										translation,
-										c, false);
-				}
-			}
+			c.addResult(lw);
+			successfulLearningPerWord.put(lw, 0);
+			timeLastAttempt.put(lw, LocalDateTime.MIN);
+
+			for(String translation: Translator.getTranslation(lw.getWord().replaceAll("_", " "), 
+					lw.getCode(), LanguageCode.otherLanguage(lw.getCode())))
+				addFreeString(
+						translation,
+						c, false);
+		}
+				);
 
 		if(isOriginalString)
-			try {
 				updateFile();
-
-				addToRawTextDatabase(lt);
-			} catch (IOException e) {
-				e.printStackTrace();
-				throw new Error();
-			}
-	}
-
-	private void addToRawTextDatabase(String string) {
-		while(string.startsWith("\n"))
-			string = string.substring(1);
-		rawTextDatabase.add(string);
-		updateRawTextDatabase();
 	}
 
 
-	private void updateRawTextDatabase() {
+
+
+	private void updateFile() {
 		String res = "";
-		for(String s:rawTextDatabase)
-			res+=s.replaceAll("|","")+"|\n";
+		for(LanguageWord s: successfulLearningPerWord.keySet())
+			res+=s.getWord()+";"+s.getCode()+";"+successfulLearningPerWord.get(s)+";"+timeLastAttempt.get(s)+"\n";
+
+		Charset cs = Charset.forName("ISO-8859-1");
 		try {
-			Files.writeString(RECORD_FILEPATH, res,Charset.forName("ISO-8859-1"));
+			Files.writeString(FILEPATH, res,cs);
 		} catch (IOException e) {
 			e.printStackTrace();
 			throw new Error();
@@ -126,80 +121,25 @@ public class VocabularyLearningStatus {
 	}
 
 
-	private void updateFile() throws IOException {
-		String res = "";
-		for(LanguageWord s: successfulLearningPerWord.keySet())
-			res+=s.getWord()+";"+s.getCode()+";"+successfulLearningPerWord.get(s)+";"+timeLastAttempt.get(s)+"\n";
-		
-		Charset cs = Charset.forName("ISO-8859-1");
-		Files.writeString(FILEPATH, res,cs);
-	}
-
-
 	public String toString() {return successfulLearningPerWord.toString();}
 
-	public void resetWord(String string, String countryCode) throws IOException {
-		successfulLearningPerWord.get(countryCode).put(string,0);
-		updateFile();
-	}
 
 
 	/*public String overlay(String string) {
 		String res = "";
-		
+
 		for(String s: string.split(" "))
 		{
 			String sCleared = clearOfSymbols(s);
 			if(is)
-			
+
 		}
-			
+
 	}*/
 
 
-	public static String clearOfSymbols(String string) {
-		string = string.replaceAll(",", " ");
-		string = string.replaceAll("^", " ");
-		string = string.replaceAll("”", " ");
-		string = string.replaceAll("\\.", " ");
-		string = string.replaceAll(";", " ");
-		string = string.replaceAll("\\(", " ");
-		string = string.replaceAll("\\)", " ");
-		string = string.replaceAll("\\]", " ");
-		string = string.replaceAll("\\[", " ");
-		string = string.replaceAll("!", " ");
-		string = string.replaceAll("\\|", " ");
-		string = string.replaceAll(":", " ");
-		string = string.replaceAll("\\?", " ");
-		string = string.toLowerCase();
-		string = string.replaceAll("\n", " ");
-		string = string.replaceAll("[0-9]", "");
-		while(string.contains("  "))
-			string = string.replaceAll("  ", " ");
-		
-		return string;
-	}
+	
 
-
-	public double knownRatio(String string) {
-		String res = "";
-
-		int known = 0;
-		int total = 0;
-		for(String s: string.split(" "))
-		{
-			String sCleared = clearOfSymbols(s);
-			if(isMastered(sCleared)) known++;
-			total++;
-		}
-		
-		return (double)known/total;
-	}
-
-
-	private boolean isMastered(String s, String countryCode) {
-		return successfulLearningPerWord.get(countryCode).get(s)>MAX_LEARNED;
-	}
 
 
 	/*public double vocabularyKnownRatio() {
@@ -214,17 +154,21 @@ public class VocabularyLearningStatus {
 
 
 	public int getNumberOfSuccessLearning(LanguageWord s) {
+		if(!successfulLearningPerWord.containsKey(s))return 0;
 		return successfulLearningPerWord.get(s);
 	}
 
 
 	public LocalDateTime getLastSuccessOf(LanguageWord s) {
+		if(!timeLastAttempt.containsKey(s))
+			return LocalDateTime.MIN;
 		return timeLastAttempt.get(s);
 	}
 
 
-	public void incrementSuccess(LanguageWord lastWordAsked) throws IOException {
+	public void incrementSuccess(LanguageWord lastWordAsked) {
 		timeLastAttempt.put(lastWordAsked, LocalDateTime.now());
+		if(!successfulLearningPerWord.containsKey(lastWordAsked))successfulLearningPerWord.put(lastWordAsked, 0);
 		successfulLearningPerWord.put(lastWordAsked,successfulLearningPerWord.get(lastWordAsked)+1);
 		updateFile();
 	}
@@ -254,8 +198,32 @@ public class VocabularyLearningStatus {
 	}
 
 
-
-
+	public boolean isShortTermWord(LanguageWord newInstance) {
+		return getNumberOfSuccessLearning(newInstance)<=SHORT_TERM_NUMBER_OF_REPEAT;
+	}
 	
+	public boolean isMidTermWord(LanguageWord newInstance) {
+		return getNumberOfSuccessLearning(newInstance)<=MID_TERM_NUMBER_OF_REPEAT &&
+				! isShortTermWord(newInstance);
+	}
+	
+	public boolean isLongTermWord(LanguageWord newInstance) {
+		return !isShortTermWord(newInstance)&&!isMidTermWord(newInstance);
+	}
+
+
+	public void strongIncrement(LanguageWord lastWordAsked) {
+		while(!isLongTermWord(lastWordAsked)) incrementSuccess(lastWordAsked);
+	}
+
+
+	public boolean isReadyToBeExposedAgain(LanguageWord s) {
+		return LearningModel.isTimeForLearning(s, this);
+	}
+
+
+
+
+
 
 }

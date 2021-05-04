@@ -1,11 +1,10 @@
-package discordforrad.learningModel;
+package discordforrad.models;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.temporal.TemporalAmount;
 import java.util.stream.Collectors;
 
-import discordforrad.VocabularyLearningStatus;
 import discordforrad.languageModel.LanguageWord;
 
 public class LearningModel {

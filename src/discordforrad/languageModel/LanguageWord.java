@@ -36,4 +36,8 @@ public class LanguageWord {
 		return lc+":"+word;
 	}
 
+	public static LanguageWord newInstance(String s, LanguageCode languageCode) {
+		return new LanguageWord(languageCode, s.toLowerCase());
+	}
+
 }

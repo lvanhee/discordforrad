@@ -17,7 +17,8 @@ public class AddStringResultContext {
 	}
 	
 	public void addResult(LanguageWord lw) {
-		this.onAddingWord.accept(lw);
+		if(!words.contains(lw))
+			this.onAddingWord.accept(lw);
 		words.add(lw);
 	}
 

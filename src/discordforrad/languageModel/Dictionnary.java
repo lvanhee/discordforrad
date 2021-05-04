@@ -17,6 +17,13 @@ public class Dictionnary {
 	}
 
 	private static boolean isEnglishWord(LanguageWord lw) {
+		if(lw.getWord().contains("å")||
+				lw.getWord().contains("Å")||
+				lw.getWord().contains("ö")||
+				lw.getWord().contains("Ö")||
+				lw.getWord().contains("ä")||
+				lw.getWord().contains("Ä")
+				) return false;
 		if(isWordInReferenceWord(lw))
 			return true;
 		if(isInBabLaReferenceWord(lw))
@@ -61,7 +68,7 @@ public class Dictionnary {
 		String pageCode = header+"en.bab.la/dictionary/"+languageInPlainText+"-"+otherLanguageInPlainText+
 				"/"+lw.getWord();
 		
-		String webPageContents = WebpageReader.downloadWebPage(pageCode);
+		String webPageContents = WebpageReader.downloadWebPage(pageCode, lw.toString());
 		if(webPageContents.toLowerCase()
 				.contains("our team was informed that the translation for \""+lw.getWord()+"\" is missing"))
 			return false;	
@@ -76,7 +83,7 @@ public class Dictionnary {
 	{	 
 		String pageToAskFor = "https://folkets-lexikon.csc.kth.se/folkets/"+'#'
 				+lw.getWord().replaceAll("_", "%20");
-		String webPageContents = WebpageReader.downloadWebPage(pageToAskFor);
+		String webPageContents = WebpageReader.downloadWebPage(pageToAskFor, lw.toString());
 		System.out.println("----------------------");
 		System.out.println(webPageContents);
 		boolean result = !webPageContents.contains("automaträttades till")&&
@@ -88,9 +95,10 @@ public class Dictionnary {
 		String header = "https://";
 		String pageCode = "www.wordreference.com/"+getWordReferenceNameFor(lw.getCode())+"/";
 		String pageToAskFor = header + pageCode+lw.getWord();
-		String webPageContents = WebpageReader.downloadWebPage(pageToAskFor);
+		String webPageContents = WebpageReader.downloadWebPage(pageToAskFor,lw.toString());
 		if(!webPageContents.contains(pageCode))
 			return false;
+
 		boolean result = webPageContents.contains("Matchande uppslagsord från andra sidan av ordboken.")
 				|| webPageContents.contains("is an alternate term for") 
 				|| webPageContents.toLowerCase().contains("principal translations");
