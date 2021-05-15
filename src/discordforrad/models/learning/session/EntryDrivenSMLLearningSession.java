@@ -2,6 +2,8 @@ package discordforrad.models.learning.session;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
@@ -25,6 +27,14 @@ public class EntryDrivenSMLLearningSession {
 	private final int nbShortToExplore;
 	private final int nbMidToExplore;
 	private final int nbLongToExplore;
+	
+	private int nbSuccessShort = 0;
+	private int nbSuccessMid = 0;
+	private int nbSuccessLong = 0;
+	
+	private LanguageWord current = null;
+	private enum SML{SHORT, MIDDLE,LONG}
+	private SML temporalityLastAttempt=null;
 
 	private EntryDrivenSMLLearningSession(ReadThroughFocus currentFocus, 
 			VocabularyLearningStatus vls) {
@@ -44,17 +54,26 @@ public class EntryDrivenSMLLearningSession {
 				longList.add(lw);
 			else throw new Error();
 		
+		shortList = new ArrayList<>(new LinkedHashSet<>(shortList));
+		midList = new ArrayList<>(new LinkedHashSet<>(midList));
+		longList = new ArrayList<>(new LinkedHashSet<>(longList));
+		
+		Collections.shuffle(longList);
+		Collections.shuffle(midList);
+		
+		
 
-		shortTermWordsToTeachInThisSession = shortList.subList(0, Math.min(10, shortList.size()));
-		midTermWordsToTeachInThisSession = midList.subList(0, Math.min(10, midList.size()));
-		longTermWordsToTeachInThisSession = longList.subList(0, Math.min(10, longList.size()));
+		shortTermWordsToTeachInThisSession = shortList.subList(0, Math.min(20, shortList.size()));
+		midTermWordsToTeachInThisSession = vls.getStandardSessionMidTermWordsToLearn();
+		longTermWordsToTeachInThisSession = vls.getStandardSessionLongTermWordsToLearn();
+		
 		isFocusFullyCompleted = shortTermWordsToTeachInThisSession.isEmpty() &&
 				midTermWordsToTeachInThisSession.isEmpty() &&
 				longTermWordsToTeachInThisSession.isEmpty();
 		
-		nbShortToExplore = shortList.size();
-		nbMidToExplore = midList.size();
-		nbLongToExplore = longList.size();
+		nbShortToExplore = shortTermWordsToTeachInThisSession.size();
+		nbMidToExplore = midTermWordsToTeachInThisSession.size();
+		nbLongToExplore = longTermWordsToTeachInThisSession.size();
 		
 		/*FORMER PROCEDURE FOR THE FULL RANDOM LEARNING
 		 * 
@@ -111,13 +130,19 @@ public class EntryDrivenSMLLearningSession {
 	public LanguageWord getNextWord() {
 		LanguageWord word = null;
 		if(!shortTermWordsToTeachInThisSession.isEmpty())
-		{word = shortTermWordsToTeachInThisSession.get(0); shortTermWordsToTeachInThisSession.remove(0);}
+		{
+			temporalityLastAttempt = SML.SHORT;
+			word = shortTermWordsToTeachInThisSession.get(0); shortTermWordsToTeachInThisSession.remove(0);}
 		else if(!midTermWordsToTeachInThisSession.isEmpty())
-		{word = midTermWordsToTeachInThisSession.get(0); midTermWordsToTeachInThisSession.remove(0);}
+		{
+			temporalityLastAttempt = SML.MIDDLE;
+			word = midTermWordsToTeachInThisSession.get(0); midTermWordsToTeachInThisSession.remove(0);}
 		else if(!longTermWordsToTeachInThisSession.isEmpty())
-		{word = longTermWordsToTeachInThisSession.get(0); longTermWordsToTeachInThisSession.remove(0);}
+		{
+			temporalityLastAttempt = SML.LONG;
+			word = longTermWordsToTeachInThisSession.get(0); longTermWordsToTeachInThisSession.remove(0);}
+		current = word;
 		return word;
-
 	}
 
 	public String getStatisticsOnRemainingToLearn() {
@@ -130,6 +155,38 @@ public class EntryDrivenSMLLearningSession {
 		return shortTermWordsToTeachInThisSession.isEmpty()
 				&&midTermWordsToTeachInThisSession.isEmpty() 
 				&& longTermWordsToTeachInThisSession.isEmpty();
+	}
+
+	public void confirm(LanguageWord lastWordAsked) {
+		if(temporalityLastAttempt == SML.SHORT)nbSuccessShort++;
+		else if(temporalityLastAttempt == SML.MIDDLE)nbSuccessMid++;
+		else if(temporalityLastAttempt == SML.LONG)nbSuccessLong++;
+		else
+			throw new Error();
+	}
+
+	public int getNbSuccessShortTerm() {
+		return nbSuccessShort;
+	}
+
+	public int getNbSuccessMidTerm() {
+		return nbSuccessMid;
+	}
+
+	public int getNbSuccessLongTerm() {
+		return nbSuccessLong;
+	}
+
+	public int getNbShortTermWordsAsked() {
+		return nbShortToExplore;
+	}
+	
+	public int getNbMidTermWordsAsked() {
+		return nbMidToExplore;
+	}
+	
+	public int getNbLongTermWordsAsked() {
+		return nbLongToExplore;
 	}
 
 }

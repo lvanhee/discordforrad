@@ -145,6 +145,22 @@ public class OrdforrAIListener extends ListenerAdapter {
 				res+="***"+currentString+"***";
 		}
 		
-		OrdforrAIListener.discussionChannel.sendMessage(res).queue();
+		while(res.length()>1000)
+		{
+			String toPrint = res.substring(0, 1000);
+			res = res.substring(1000);
+			int indexSplit = res.indexOf(".")+1;
+			toPrint+=res.substring(0,indexSplit);
+			res = res.substring(indexSplit);
+			OrdforrAIListener.discussionChannel.sendMessage(toPrint).queue();
+		}
+		try {
+		if(!res.isEmpty())
+			OrdforrAIListener.discussionChannel.sendMessage(res).queue();
+		}
+		catch(IllegalStateException e)
+		{
+			throw new Error();
+		}
 	}
 }

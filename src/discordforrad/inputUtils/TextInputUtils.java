@@ -17,6 +17,7 @@ public class TextInputUtils {
 				.replaceAll("ã¥", "å")
 				.replaceAll("ã…", "Å")
 				.replaceAll("ã\\?", "Å")
+				.replaceAll("ï¿½", "ö")
 				.replaceAll("ã¶", "ö");
 		
 	}
@@ -33,6 +34,7 @@ public class TextInputUtils {
 	
 	public static String clearOfSymbols(String string) {
 		string = string.replaceAll(",", " ");
+		string = string.replaceAll("%", " ");
 		string = string.replaceAll("/", " ");
 		string = string.replaceAll("-", " ");
 		string = string.replaceAll("^", " ");
@@ -50,6 +52,7 @@ public class TextInputUtils {
 		string = string.replaceAll("\\?", " ");
 		string = string.toLowerCase();
 		string = string.replaceAll("\n", " ");
+		string = string.replaceAll("–", " ");
 		string = string.replaceAll("[0-9]", "");
 		while(string.contains("  "))
 			string = string.replaceAll("  ", " ");

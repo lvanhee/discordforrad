@@ -8,6 +8,8 @@ public class LanguageWord {
 	
 	public LanguageWord(LanguageCode lc, String word)
 	{
+		if(word.contains("!"))
+			throw new Error();
 		this.lc = lc;
 		this.word = word;
 	}

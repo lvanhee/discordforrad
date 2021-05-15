@@ -21,11 +21,11 @@ import discordforrad.models.learning.session.EntryDrivenSMLLearningSession;
 
 public enum DisOrdforrAI {
 	INSTANCE;
-	
+
 	private final VocabularyLearningStatus vls;
 	private ReadThroughFocus currentFocus = ReadThroughFocus.loadCurrentFocus();
 	private EntryDrivenSMLLearningSession currentSession;
-	
+
 	private LanguageWord lastWordAsked = null;
 	private DisOrdforrAI()
 	{
@@ -35,32 +35,32 @@ public enum DisOrdforrAI {
 			e.printStackTrace();
 			throw new Error();
 		}
-		
+
 		currentSession = EntryDrivenSMLLearningSession.default3x3LearningSession(currentFocus,vls);
 	}
-	
-	
+
+
 	public void askForNextWord() {
 		if(currentSession.isSessionOver()) {			
 			OrdforrAIListener.discussionChannel.sendMessage("No more words to ask for this session").queue();
-			
+
 			INSTANCE.displayStatistics();
 			return;		
 		}
 		lastWordAsked = currentSession.getNextWord();
-		
+
 		LanguageCode translateTo = LanguageCode.EN;
 		if(lastWordAsked.getCode()==LanguageCode.EN) translateTo = LanguageCode.SV;
-		
+
 		Set<String> translatedWord = Translator.getTranslation(lastWordAsked.getWord(), lastWordAsked.getCode(),translateTo);
-		
+
 		String toAsk = "**"+lastWordAsked.getCode()+"\t"+lastWordAsked.getWord()+"\t"+ currentSession.getStatisticsOnRemainingToLearn()+"**\n||"+translatedWord+"||";
-		
+
 		OrdforrAIListener.discussionChannel.sendMessage(toAsk).queue();
 	}
 
 	public void displayStatistics() {
-		
+
 		discordforrad.discordmanagement.OrdforrAIListener
 		.printWithEmphasisOnWords(currentFocus.getRawText(), vls,currentFocus.getLanguageCode());
 
@@ -69,22 +69,25 @@ public enum DisOrdforrAI {
 		int midTerm = vls.getAllMidTermWords().size();
 		int longTerm = vls.getAllLongTermWords().size();
 		String res = "The current size of encountered vocabulary is of "+ vocabularySize+" words\n";
-		res = "There are "+shortTerm+" words unexplored; "+midTerm+" words being learned and "+longTerm+" words mastered.\n";
-		
+		res = "There are "+shortTerm+" words unexplored; "+midTerm+" words being learned and "+longTerm+" words mastered.\n"
+				+"Success rate. Short "+currentSession.getNbSuccessShortTerm()+"/"+currentSession.getNbShortTermWordsAsked()+" "
+				+" mid:"+currentSession.getNbSuccessMidTerm()+"/"+currentSession.getNbMidTermWordsAsked()+" "
+				+" long"+currentSession.getNbSuccessLongTerm()+"/"+currentSession.getNbLongTermWordsAsked();
+
 		OrdforrAIListener.discussionChannel.sendMessage(res).queue();
-		
-		
+
+
 		if(currentFocus != null && currentFocus instanceof ReadThroughFocus)
 		{
 			long shortTermT = currentFocus.getAllSortedWords().stream().collect(Collectors.toSet())
 					.stream().filter(x->vls.isShortTermWord(x)).count();
-			
+
 			long midTermT = currentFocus.getAllSortedWords().stream().collect(Collectors.toSet())
 					.stream().filter(x->vls.isMidTermWord(x)).count();
-			
+
 			long longTermT = currentFocus.getAllSortedWords().stream().collect(Collectors.toSet())
 					.stream().filter(x->vls.isLongTermWord(x)).count();
-			
+
 			OrdforrAIListener.discussionChannel.sendMessage("In the current focus, there are: "
 					+shortTermT+" words unexplored; "
 					+midTermT+" words being learned and "
@@ -96,14 +99,17 @@ public enum DisOrdforrAI {
 
 	public void confirm(boolean strong) {
 		if(lastWordAsked!=null)
+		{
+			currentSession.confirm(lastWordAsked);
 			if(strong)
 				vls.strongIncrement(lastWordAsked);
 			else
 				vls.incrementSuccess(lastWordAsked);
+		}
 		askForNextWord();		
 	}
-	
-	
+
+
 
 
 	public void forgottenLastWord() throws IOException {
@@ -111,45 +117,65 @@ public enum DisOrdforrAI {
 		{
 			vls.decrementSuccessUpToOne(lastWordAsked);
 		}
-		
+
 		askForNextWord();
 	}
 
 
 	public void addFreeString(String languageText, AddStringResultContext c) {
+		discordforrad.discordmanagement.OrdforrAIListener.printWithEmphasisOnWords(languageText, vls,LanguageCode.SV);
+
+		if(languageText.length()<2000)
+			discordforrad.discordmanagement.OrdforrAIListener.discussionChannel.sendMessage(Translator.translate(languageText, LanguageCode.SV, LanguageCode.EN)).queue();
+		else
+			discordforrad.discordmanagement.OrdforrAIListener.discussionChannel.sendMessage("Text too long to be translated").queue();
+
+
 		vls.addFreeString(languageText,c, true);
 		String index = RawLearningTextDatabaseManager.add(languageText);
-		
+
 		long nbShortTerm = vls.getAllShortTermWords().parallelStream().filter(x->c.getWords().contains(x)).count();
 		long nbMidTerm = vls.getAllMidTermWords().parallelStream().filter(x->c.getWords().contains(x)).count();
 		long nbLongTerm = vls.getAllLongTermWords().parallelStream().filter(x->c.getWords().contains(x)).count();
-		
+
 		List<String> l = TextInputUtils.toListOfWords(languageText);
 		Set<String> allWords = l.stream().collect(Collectors.toSet());
 		long nbShortTermT = vls.getAllShortTermWords().parallelStream().filter(x->allWords.contains(x.getWord())).count();
 		long nbMidTermT = vls.getAllMidTermWords().parallelStream().filter(x->allWords.contains(x.getWord())).count();
 		long nbLongTermT = vls.getAllLongTermWords().parallelStream().filter(x->allWords.contains(x.getWord())).count();
 
-//		discordforrad.discordmanagement.OrdforrAIListener.discussionChannel.sendMessage("Added "+c.getWords().size()+" new words: "+c.getWords()).queue();
+		//		discordforrad.discordmanagement.OrdforrAIListener.discussionChannel.sendMessage("Added "+c.getWords().size()+" new words: "+c.getWords()).queue();
 
-		discordforrad.discordmanagement.OrdforrAIListener.discussionChannel.sendMessage("Added "+c.getWords().size()+" new words: "+c.getWords()
-		+" among which: "+nbShortTerm+" are new; "+nbMidTerm+" are being assimilated and "+nbLongTerm+" have been been validated").queue();
+		String statistics = "Added "+c.getWords().size()
+				+" among which: "+nbShortTerm+" are new; "+nbMidTerm+" are being assimilated and "+nbLongTerm+" have been been validated\n"
+				;
 		
+
+		String toPrint = c.getWords()+"\n"+statistics;
+		while(toPrint.length()>2000)
+		{
+			String toPrintNow = toPrint.substring(0,2000);
+			toPrint = toPrint.substring(2000);
+			discordforrad.discordmanagement.OrdforrAIListener.discussionChannel.sendMessage(toPrintNow).queue();
+		}
+		
+		discordforrad.discordmanagement.OrdforrAIListener.discussionChannel.sendMessage(toPrint).queue();
+
 		discordforrad.discordmanagement.OrdforrAIListener.discussionChannel.sendMessage("The text contains "+l.size()+" words; "+allWords.size()
 		+" different words among which "+nbShortTermT+" are new; "+nbMidTermT+" are being assimilated and "+nbLongTermT+" have been been validated").queue();
-		
+
 		discordforrad.discordmanagement.OrdforrAIListener.discussionChannel.sendMessage("The name of this entry is: "+index).queue();
-		
+
 		askForNextWord();
 	}
 
-	
+
 	public void startNewSession()
 	{
-		
+
 		currentSession = EntryDrivenSMLLearningSession.default3x3LearningSession(currentFocus, vls);
-		
-		
+
+
 		askForNextWord();
 	}
 
@@ -157,15 +183,15 @@ public enum DisOrdforrAI {
 	public void setFocus(ReadThroughFocus f) {
 		this.currentFocus = f;
 		ReadThroughFocus.saveFocusOnFile(f);
-		
+
 		OrdforrAIListener.discussionChannel.sendMessage("Updated focus to learning vocabulary for reading through entry: "+f.getIndex()).queue();
-		
+
 		String raw = f.getRawText();
-		
+
 		discordforrad.discordmanagement.OrdforrAIListener.printWithEmphasisOnWords(raw, vls,f.getLanguageCode());
-		
+
 		startNewSession();
-		
+
 	}
-	
+
 }

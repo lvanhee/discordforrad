@@ -8,8 +8,10 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -26,8 +28,10 @@ import discordforrad.languageModel.LanguageWord;
 public class VocabularyLearningStatus {
 	private static final Path FILEPATH = Paths.get("data/learned_words.txt");
 	private static final int MAX_LEARNED = 10;
-	private static final int SHORT_TERM_NUMBER_OF_REPEAT = 1;
+	private static final int SHORT_TERM_NUMBER_OF_REPEAT = 2;
 	private static final int MID_TERM_NUMBER_OF_REPEAT = 7;
+	private static final int DEFAULT_MID_TERM_WORDS_TO_LEARN_EVERY_SESSION = 10;
+	private static final int DEFAULT_LONG_TERM_WORDS_TO_LEARN_EVERY_SESSION = 10;
 	private final Map<LanguageWord, Integer> successfulLearningPerWord;
 	private final Map<LanguageWord, LocalDateTime> timeLastAttempt;
 
@@ -99,8 +103,8 @@ public class VocabularyLearningStatus {
 		}
 				);
 
-		if(isOriginalString)
-				updateFile();
+		//if(isOriginalString)
+		updateFile();
 	}
 
 
@@ -176,6 +180,8 @@ public class VocabularyLearningStatus {
 
 	public void decrementSuccessUpToOne(LanguageWord lastWordAsked) throws IOException {
 		timeLastAttempt.put(lastWordAsked, LocalDateTime.now());
+		if(!successfulLearningPerWord.containsKey(lastWordAsked))
+			successfulLearningPerWord.put(lastWordAsked, 0);
 		successfulLearningPerWord.put(lastWordAsked,successfulLearningPerWord.get(lastWordAsked)-1);
 		if(successfulLearningPerWord.get(lastWordAsked)<1)
 			successfulLearningPerWord.put(lastWordAsked,1);
@@ -184,26 +190,30 @@ public class VocabularyLearningStatus {
 
 
 	public Set<LanguageWord> getAllShortTermWords() {
-		return successfulLearningPerWord.keySet().stream().filter(x->successfulLearningPerWord.get(x)<=1).collect(Collectors.toSet());
+		return successfulLearningPerWord.keySet().stream().filter(x->
+		isShortTermWord(x)).collect(Collectors.toSet());
 	}
 
 
 	public Set<LanguageWord> getAllMidTermWords() {
-		return successfulLearningPerWord.keySet().stream().filter(x->successfulLearningPerWord.get(x)>=1 && successfulLearningPerWord.get(x)<=7 ).collect(Collectors.toSet());
+		return successfulLearningPerWord.keySet().stream().filter(x->
+		isMidTermWord(x) ).collect(Collectors.toSet());
 	}
 
 
 	public Set<LanguageWord> getAllLongTermWords() {
-		return successfulLearningPerWord.keySet().stream().filter(x->successfulLearningPerWord.get(x)>7 ).collect(Collectors.toSet());
+		Set<LanguageWord> res = successfulLearningPerWord.keySet().stream()
+				.filter(x->isLongTermWord(x)).collect(Collectors.toSet()); 
+		return res;
 	}
 
 
 	public boolean isShortTermWord(LanguageWord newInstance) {
-		return getNumberOfSuccessLearning(newInstance)<=SHORT_TERM_NUMBER_OF_REPEAT;
+		return getNumberOfSuccessLearning(newInstance)<SHORT_TERM_NUMBER_OF_REPEAT;
 	}
 	
 	public boolean isMidTermWord(LanguageWord newInstance) {
-		return getNumberOfSuccessLearning(newInstance)<=MID_TERM_NUMBER_OF_REPEAT &&
+		return getNumberOfSuccessLearning(newInstance)<MID_TERM_NUMBER_OF_REPEAT &&
 				! isShortTermWord(newInstance);
 	}
 	
@@ -219,6 +229,41 @@ public class VocabularyLearningStatus {
 
 	public boolean isReadyToBeExposedAgain(LanguageWord s) {
 		return LearningModel.isTimeForLearning(s, this);
+	}
+
+
+	public List<LanguageWord> getStandardSessionMidTermWordsToLearn() {
+		int nbToPick = 
+				Math.min(Math.max(DEFAULT_MID_TERM_WORDS_TO_LEARN_EVERY_SESSION, getLearnableMidTermWords().size()/10),
+						getLearnableMidTermWords().size());
+		
+		
+		List<LanguageWord> learnableMidTerm = getLearnableMidTermWords().stream().collect(Collectors.toList());
+		Collections.shuffle(learnableMidTerm);
+		return learnableMidTerm.subList(0, nbToPick);
+	}
+
+
+	public Set<LanguageWord> getLearnableMidTermWords() {
+		return getAllMidTermWords().stream().filter(x->LearningModel.isTimeForLearning(x, this)).collect(Collectors.toSet());
+	}
+
+
+	public List<LanguageWord> getStandardSessionLongTermWordsToLearn() {
+		int nbToPick = 
+				Math.min(Math.max(DEFAULT_LONG_TERM_WORDS_TO_LEARN_EVERY_SESSION, getLearnableLongTermWords().size()/10),
+						getLearnableLongTermWords().size());
+		
+		
+		List<LanguageWord> learnableMidTerm = getLearnableLongTermWords().stream().collect(Collectors.toList());
+		Collections.shuffle(learnableMidTerm);
+		return learnableMidTerm.subList(0, nbToPick);
+	}
+
+
+	private Set<LanguageWord> getLearnableLongTermWords() {
+		Set<LanguageWord> res = getAllLongTermWords().stream().filter(x->LearningModel.isTimeForLearning(x, this)).collect(Collectors.toSet()); 
+		return res;
 	}
 
 

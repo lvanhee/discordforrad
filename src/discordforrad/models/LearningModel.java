@@ -29,7 +29,11 @@ public class LearningModel {
 	private static TemporalAmount getTimeBetweenIncrementsForLearning(int numberOfSuccessLearning) {
 		if(numberOfSuccessLearning==0) return Duration.ZERO;
 		if(numberOfSuccessLearning==1) return Duration.ofHours(6);
-		return Duration.ofDays(numberOfSuccessLearning-1);
+		if(numberOfSuccessLearning<7)
+			return Duration.ofDays(numberOfSuccessLearning-1);
+		else
+			return Duration.ofDays(numberOfSuccessLearning*numberOfSuccessLearning);
+		
 		
 	}
 
