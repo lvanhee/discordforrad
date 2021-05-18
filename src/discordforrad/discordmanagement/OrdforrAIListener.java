@@ -10,6 +10,7 @@ import discordforrad.DisOrdforrAI;
 import discordforrad.LanguageCode;
 import discordforrad.Main;
 import discordforrad.inputUtils.TextInputUtils;
+import discordforrad.languageModel.LanguageText;
 import discordforrad.languageModel.LanguageWord;
 import discordforrad.models.VocabularyLearningStatus;
 import discordforrad.models.learning.focus.ReadThroughFocus;
@@ -107,8 +108,10 @@ public class OrdforrAIListener extends ListenerAdapter {
 		}
 	}
 
-	public static void printWithEmphasisOnWords(String raw, VocabularyLearningStatus vls, LanguageCode languageCode) {
+	public static void printWithEmphasisOnWords(LanguageText lt, VocabularyLearningStatus vls) {
 		
+		String raw = lt.getText();
+		LanguageCode languageCode = lt.getLanguageCode();
 		String res = "";
 		int current = 0;
 		String currentString="";
@@ -163,4 +166,5 @@ public class OrdforrAIListener extends ListenerAdapter {
 			throw new Error();
 		}
 	}
+
 }

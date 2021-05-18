@@ -5,10 +5,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import discordforrad.LanguageCode;
 import discordforrad.inputUtils.RawLearningTextDatabaseManager;
@@ -20,13 +22,11 @@ public class ReadThroughFocus {
 	
 	private static final Path FOCUS_PATH = Paths.get("data/focus/current_focus.txt");  
 	
-	private final String index;
-	private final LanguageCode lc;
+	private final List<LanguageText> texts;
 	
 
-	public ReadThroughFocus(String string, LanguageCode lc2) {
-		this.index = string;
-		this.lc = lc2;
+	public ReadThroughFocus(List<LanguageText> texts) {
+		this.texts = texts;
 	}
 
 	public static ReadThroughFocus loadCurrentFocus() {
@@ -38,31 +38,27 @@ public class ReadThroughFocus {
 		}
 	}
 
-	private static ReadThroughFocus parse(String string) {
-		LanguageCode lc = LanguageCode.valueOf(string.substring(0,2));
-		String index = string.substring(3);
+	private static ReadThroughFocus parse(String input) {
+		List<LanguageText> texts = new LinkedList<>();
+		input = input.replaceAll("\r", "");
+		for(String s: input.split("\n"))
+		{
+			String inputText = RawLearningTextDatabaseManager.fromID(s.substring(3));
+			
+			texts.add(LanguageText.newInstance(
+					LanguageCode.valueOf(s.substring(0,2)),
+					inputText));
+		}
 		
-		return new ReadThroughFocus(index,lc);
+		return new ReadThroughFocus(texts);
 	}
 
-	public List<LanguageWord> getAllSortedWords() {
-		Set<String> words = new HashSet<>();
-		List<LanguageWord> res = new ArrayList<>();
-		
-		List<String> l = TextInputUtils.toListOfWords(RawLearningTextDatabaseManager.fromID(index));
-		
-		for(String s: l)
-			if(!words.contains(s))
-			{
-				words.add(s);
-				res.add(LanguageWord.newInstance(s,lc));
-			}
-		
-		return res;
+	public List<LanguageWord> getAllValidSortedWords() {
+		return texts.stream().map(x->x.getListOfValidWords()).reduce(new ArrayList<LanguageWord>(), (x,y)->{x.addAll(y); return x;});
 	}
 
 	public static ReadThroughFocus newInstance(String string, LanguageCode lc) {
-		return new ReadThroughFocus(string, lc);
+		return new ReadThroughFocus(Arrays.asList(LanguageText.newInstance(lc, string)));
 	}
 
 	public static void saveFocusOnFile(ReadThroughFocus f) {
@@ -74,17 +70,7 @@ public class ReadThroughFocus {
 		}
 	}
 
-	public String getIndex() {
-		return index;
+	public List<LanguageText> getLanguageTextList() {
+		return texts;
 	}
-
-	public String getRawText() {
-		return RawLearningTextDatabaseManager.fromID(index);
-	}
-
-	public LanguageCode getLanguageCode() {
-		return lc;
-	}
-
-
 }

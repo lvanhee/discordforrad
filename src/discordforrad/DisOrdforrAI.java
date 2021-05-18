@@ -61,8 +61,9 @@ public enum DisOrdforrAI {
 
 	public void displayStatistics() {
 
+		for(LanguageText lt: currentFocus.getLanguageTextList())
 		discordforrad.discordmanagement.OrdforrAIListener
-		.printWithEmphasisOnWords(currentFocus.getRawText(), vls,currentFocus.getLanguageCode());
+		.printWithEmphasisOnWords(lt, vls);
 
 		int vocabularySize = vls.getAllWords().size();
 		int shortTerm = vls.getAllShortTermWords().size();
@@ -79,13 +80,13 @@ public enum DisOrdforrAI {
 
 		if(currentFocus != null && currentFocus instanceof ReadThroughFocus)
 		{
-			long shortTermT = currentFocus.getAllSortedWords().stream().collect(Collectors.toSet())
+			long shortTermT = currentFocus.getAllValidSortedWords().stream().collect(Collectors.toSet())
 					.stream().filter(x->vls.isShortTermWord(x)).count();
 
-			long midTermT = currentFocus.getAllSortedWords().stream().collect(Collectors.toSet())
+			long midTermT = currentFocus.getAllValidSortedWords().stream().collect(Collectors.toSet())
 					.stream().filter(x->vls.isMidTermWord(x)).count();
 
-			long longTermT = currentFocus.getAllSortedWords().stream().collect(Collectors.toSet())
+			long longTermT = currentFocus.getAllValidSortedWords().stream().collect(Collectors.toSet())
 					.stream().filter(x->vls.isLongTermWord(x)).count();
 
 			OrdforrAIListener.discussionChannel.sendMessage("In the current focus, there are: "
@@ -123,6 +124,7 @@ public enum DisOrdforrAI {
 
 
 	public void addFreeString(String languageText, AddStringResultContext c) {
+		
 		discordforrad.discordmanagement.OrdforrAIListener.printWithEmphasisOnWords(languageText, vls,LanguageCode.SV);
 
 		if(languageText.length()<2000)
@@ -130,7 +132,7 @@ public enum DisOrdforrAI {
 		else
 			discordforrad.discordmanagement.OrdforrAIListener.discussionChannel.sendMessage("Text too long to be translated").queue();
 
-
+		Runnable r = ()->{
 		vls.addFreeString(languageText,c, true);
 		String index = RawLearningTextDatabaseManager.add(languageText);
 
@@ -159,6 +161,11 @@ public enum DisOrdforrAI {
 			discordforrad.discordmanagement.OrdforrAIListener.discussionChannel.sendMessage(toPrintNow).queue();
 		}
 		
+		if(languageText.length()<2000)
+			discordforrad.discordmanagement.OrdforrAIListener.discussionChannel.sendMessage(Translator.translate(languageText, LanguageCode.SV, LanguageCode.EN)).queue();
+		else
+			discordforrad.discordmanagement.OrdforrAIListener.discussionChannel.sendMessage("Text too long to be translated").queue();
+		
 		discordforrad.discordmanagement.OrdforrAIListener.discussionChannel.sendMessage(toPrint).queue();
 
 		discordforrad.discordmanagement.OrdforrAIListener.discussionChannel.sendMessage("The text contains "+l.size()+" words; "+allWords.size()
@@ -166,7 +173,9 @@ public enum DisOrdforrAI {
 
 		discordforrad.discordmanagement.OrdforrAIListener.discussionChannel.sendMessage("The name of this entry is: "+index).queue();
 
-		askForNextWord();
+		};
+		new Thread(r).start();
+		//askForNextWord();
 	}
 
 

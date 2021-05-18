@@ -5,9 +5,12 @@ import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import discordforrad.LanguageCode;
+import discordforrad.inputUtils.TextInputUtils;
 
 
 public class LanguageText {
@@ -16,6 +19,8 @@ public class LanguageText {
 
 	public LanguageText(String txt, LanguageCode l)
 	{
+		if(txt==null)
+			throw new Error();
 		this.text = txt;
 		this.lc = l;
 	}
@@ -36,6 +41,13 @@ public class LanguageText {
 
 	public static LanguageText newInstance(LanguageCode lc, String text) {
 		return new LanguageText(text, lc);
+	}
+
+	public List<LanguageWord> getListOfValidWords() {
+		return TextInputUtils.toListOfWords(text).stream()
+				.map(x->LanguageWord.newInstance(x, lc))
+				.filter(x->Dictionnary.isInDictionnaries(x))
+				.collect(Collectors.toList());
 	}
 	
 }

@@ -41,6 +41,8 @@ public class RawLearningTextDatabaseManager {
 	}
 
 	public static String fromID(String index) {
+		if(!indexedEntries.containsKey(index))
+			throw new Error();
 		return indexedEntries.get(index);
 	}
 

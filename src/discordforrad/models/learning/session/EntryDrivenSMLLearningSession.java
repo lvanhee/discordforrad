@@ -39,7 +39,7 @@ public class EntryDrivenSMLLearningSession {
 	private EntryDrivenSMLLearningSession(ReadThroughFocus currentFocus, 
 			VocabularyLearningStatus vls) {
 
-		List<LanguageWord> allWords = currentFocus.getAllSortedWords();
+		List<LanguageWord> allWords = currentFocus.getAllValidSortedWords();
 		
 		List<LanguageWord> shortList = new ArrayList<>();
 		List<LanguageWord> midList = new ArrayList<>();

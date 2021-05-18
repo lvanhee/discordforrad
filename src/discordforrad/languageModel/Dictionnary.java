@@ -1,19 +1,91 @@
 package discordforrad.languageModel;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.nio.file.Paths;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
 import discordforrad.LanguageCode;
 import discordforrad.inputUtils.WebpageReader;
 
 public class Dictionnary {
 	
+	private static final Set<LanguageWord> validWordCache = new HashSet<>();
+	private static final Set<LanguageWord> invalidWordCache = new HashSet<>();
+	private static final File DATABASE_VALID = Paths.get("data/cache/valid_words.obj").toFile();
+	private static final File DATABASE_INVALID = Paths.get("data/cache/invalid_words.obj").toFile();
+	static {
+		try {
+			if(DATABASE_VALID.exists()) {
+				FileInputStream fileIn = new FileInputStream(DATABASE_VALID);
+				ObjectInputStream objectIn = new ObjectInputStream(fileIn);
+
+				Object obj = objectIn.readObject();
+				objectIn.close();
+				validWordCache.addAll((Set)obj);}
+
+		} catch (Exception ex) {
+			ex.printStackTrace();
+        }
+		
+		try {
+			if(DATABASE_INVALID.exists()) {
+				FileInputStream fileIn = new FileInputStream(DATABASE_INVALID);
+				ObjectInputStream objectIn = new ObjectInputStream(fileIn);
+
+				Object obj = objectIn.readObject();
+				objectIn.close();
+				invalidWordCache.addAll((Set)obj);}
+
+		} catch (Exception ex) {
+			ex.printStackTrace();
+        }
+	}
+	
+	
+	
 	public static boolean isInDictionnaries(LanguageWord lw)
 	{
+		if(validWordCache.contains(lw))return true;
+		if(invalidWordCache.contains(lw))return false;
 		System.out.println("Searching for:"+lw+" in the dictionnaries.");
 
+		boolean res = false;
 		if(lw.getCode().equals(LanguageCode.SV))
-			return isSwedishWord(lw);
-		if(lw.getCode().equals(LanguageCode.EN))
-			return isEnglishWord(lw);
-		throw new Error();
+			res = isSwedishWord(lw);
+		else if(lw.getCode().equals(LanguageCode.EN))
+			res = isEnglishWord(lw);
+		else throw new Error();
+		
+		if(res) {
+			validWordCache.add(lw);
+			try {
+	            FileOutputStream fileOut = new FileOutputStream(DATABASE_VALID);
+	            ObjectOutputStream objectOut = new ObjectOutputStream(fileOut);
+	            objectOut.writeObject(validWordCache);
+	            objectOut.close(); 
+	        } catch (Exception ex) {
+	            ex.printStackTrace();
+	        }
+		}
+		else
+		{
+			invalidWordCache.add(lw);
+			try {
+	            FileOutputStream fileOut = new FileOutputStream(DATABASE_INVALID);
+	            ObjectOutputStream objectOut = new ObjectOutputStream(fileOut);
+	            objectOut.writeObject(invalidWordCache);
+	            objectOut.close(); 
+	        } catch (Exception ex) {
+	            ex.printStackTrace();
+	        }
+		}
+		return res;
 	}
 
 	private static boolean isEnglishWord(LanguageWord lw) {

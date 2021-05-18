@@ -1,8 +1,10 @@
 package discordforrad.languageModel;
 
+import java.io.Serializable;
+
 import discordforrad.LanguageCode;
 
-public class LanguageWord {
+public class LanguageWord implements Serializable{
 	private final LanguageCode lc;
 	private final String word;
 	
