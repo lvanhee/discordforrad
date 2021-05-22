@@ -73,4 +73,11 @@ public class ReadThroughFocus {
 	public List<LanguageText> getLanguageTextList() {
 		return texts;
 	}
+
+	public Set<LanguageText> getAllMasteredTexts(Set<LanguageWord> allLongTermWords) 
+	{
+		return texts.stream().filter(x->!x.getListOfValidWords().stream()
+				.anyMatch(y->!allLongTermWords.contains(x)))
+		.collect(Collectors.toSet());
+	}
 }

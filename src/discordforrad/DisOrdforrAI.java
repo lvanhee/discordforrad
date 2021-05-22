@@ -88,11 +88,14 @@ public enum DisOrdforrAI {
 
 			long longTermT = currentFocus.getAllValidSortedWords().stream().collect(Collectors.toSet())
 					.stream().filter(x->vls.isLongTermWord(x)).count();
+			
+			int masteredTexts = currentFocus.getAllMasteredTexts(vls.getAllLongTermWords()).size();
 
 			OrdforrAIListener.discussionChannel.sendMessage("In the current focus, there are: "
 					+shortTermT+" words unexplored; "
 					+midTermT+" words being learned and "
-					+longTermT+" words mastered.\n").queue();
+					+longTermT+" words mastered; for a total of "+
+					masteredTexts +" mastered texts\n").queue();
 		}
 
 	}
@@ -125,7 +128,8 @@ public enum DisOrdforrAI {
 
 	public void addFreeString(String languageText, AddStringResultContext c) {
 		
-		discordforrad.discordmanagement.OrdforrAIListener.printWithEmphasisOnWords(languageText, vls,LanguageCode.SV);
+		discordforrad.discordmanagement.OrdforrAIListener.printWithEmphasisOnWords(
+				LanguageText.newInstance(LanguageCode.SV, languageText), vls);
 
 		if(languageText.length()<2000)
 			discordforrad.discordmanagement.OrdforrAIListener.discussionChannel.sendMessage(Translator.translate(languageText, LanguageCode.SV, LanguageCode.EN)).queue();

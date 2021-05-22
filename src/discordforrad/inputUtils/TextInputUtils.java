@@ -33,6 +33,8 @@ public class TextInputUtils {
 	}
 	
 	public static String clearOfSymbols(String string) {
+		char c = (char)160;
+		string = string.replaceAll(c+"", "");
 		string = string.replaceAll(",", " ");
 		string = string.replaceAll("%", " ");
 		string = string.replaceAll("/", " ");
