@@ -2,7 +2,9 @@ package discordforrad.inputUtils;
 
 import java.nio.charset.Charset;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class TextInputUtils {
 	
@@ -33,9 +35,15 @@ public class TextInputUtils {
 	}
 	
 	public static String clearOfSymbols(String string) {
+		
+		Set<Character> allowedChar = new HashSet<>();
+		
+		
 		char c = (char)160;
 		string = string.replaceAll(c+"", "");
+		string = string.replaceAll("\t", "");
 		string = string.replaceAll(",", " ");
+		string = string.replaceAll("\r", " ");
 		string = string.replaceAll("%", " ");
 		string = string.replaceAll("/", " ");
 		string = string.replaceAll("-", " ");
@@ -48,13 +56,21 @@ public class TextInputUtils {
 		string = string.replaceAll("\\)", " ");
 		string = string.replaceAll("\\]", " ");
 		string = string.replaceAll("\\[", " ");
+		string = string.replaceAll("\\*", " ");
 		string = string.replaceAll("!", " ");
+		string = string.replaceAll(">", " ");
+		string = string.replaceAll("<", " ");
+		string = string.replaceAll("\\{", " ");
+		string = string.replaceAll("\\}", " ");
 		string = string.replaceAll("\\|", " ");
 		string = string.replaceAll(":", " ");
 		string = string.replaceAll("\\?", " ");
 		string = string.toLowerCase();
 		string = string.replaceAll("\n", " ");
+		string = string.replaceAll("=", " ");
+		string = string.replaceAll("'", " ");
 		string = string.replaceAll("–", " ");
+		string = string.replaceAll("&", " ");
 		string = string.replaceAll("[0-9]", "");
 		while(string.contains("  "))
 			string = string.replaceAll("  ", " ");

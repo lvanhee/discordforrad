@@ -8,8 +8,8 @@ import java.util.HashMap;
 import javax.security.auth.login.LoginException;
 
 import discordforrad.discordmanagement.OrdforrAIListener;
-import discordforrad.languageModel.Dictionnary;
-import discordforrad.languageModel.LanguageWord;
+import discordforrad.models.language.Dictionnary;
+import discordforrad.models.language.LanguageWord;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.OnlineStatus;

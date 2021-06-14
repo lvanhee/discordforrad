@@ -3,16 +3,22 @@ package discordforrad.discordmanagement;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
+
 import discordforrad.AddStringResultContext;
 import discordforrad.DisOrdforrAI;
 import discordforrad.LanguageCode;
 import discordforrad.Main;
+import discordforrad.Translator;
 import discordforrad.inputUtils.TextInputUtils;
-import discordforrad.languageModel.LanguageText;
-import discordforrad.languageModel.LanguageWord;
 import discordforrad.models.VocabularyLearningStatus;
+import discordforrad.models.language.LanguageText;
+import discordforrad.models.language.LanguageWord;
+import discordforrad.models.language.StringPair;
+import discordforrad.models.language.WordDescription;
 import discordforrad.models.learning.focus.ReadThroughFocus;
 import net.dv8tion.jda.api.entities.Message.Attachment;
 import net.dv8tion.jda.api.entities.TextChannel;
@@ -165,6 +171,44 @@ public class OrdforrAIListener extends ListenerAdapter {
 		{
 			throw new Error();
 		}
+	}
+
+	public static void print(WordDescription description) {
+		String toPrint = "";
+		
+		String translationText = "";
+		
+
+		for(String s:description.getTranslations())
+		{
+			translationText+=s+"\n";
+		}
+		
+		
+		toPrint+=translationText+"\n\n";
+		
+		List<StringPair> contextSentences = 
+				description.getContextSentences().stream()
+				.collect(Collectors.toList());
+		Collections.shuffle(contextSentences);
+		
+		for(int i = 0 ; i < 5 && i<contextSentences.size() ; i++)
+		{
+			StringPair p = contextSentences.get(i);
+			toPrint+=p.getLeft().replaceAll("<strong>", "**")
+					.replaceAll("</strong>", "**")
+					+"\n"
+					+p.getRight()+"\n\n";
+		}
+		
+		toPrint  = toPrint.substring(0,toPrint.length()-2);
+		if(toPrint.length()>2000)
+			toPrint = toPrint.substring(0,1980);
+		print("||"+toPrint+"||");
+	}
+
+	private static void print(String toPrint) {
+		OrdforrAIListener.discussionChannel.sendMessage(toPrint).queue();
 	}
 
 }

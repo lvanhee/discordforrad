@@ -4,7 +4,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Consumer;
 
-import discordforrad.languageModel.LanguageWord;
+import discordforrad.models.language.LanguageWord;
 
 public class AddStringResultContext {
 

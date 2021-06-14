@@ -1,9 +1,10 @@
-package discordforrad.languageModel;
+package discordforrad.models.language;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -44,10 +45,16 @@ public class LanguageText {
 	}
 
 	public List<LanguageWord> getListOfValidWords() {
+		
 		return TextInputUtils.toListOfWords(text).stream()
+				.sorted()
 				.map(x->LanguageWord.newInstance(x, lc))
 				.filter(x->Dictionnary.isInDictionnaries(x))
 				.collect(Collectors.toList());
+	}
+
+	public Set<LanguageWord> getSetOfValidWords() {
+		return getListOfValidWords().stream().collect(Collectors.toSet());
 	}
 	
 }

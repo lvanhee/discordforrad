@@ -1,4 +1,4 @@
-package discordforrad.languageModel;
+package discordforrad.models.language;
 
 import java.io.Serializable;
 

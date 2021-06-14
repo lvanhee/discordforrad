@@ -1,4 +1,4 @@
-package discordforrad.languageModel;
+package discordforrad.models.language;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -6,15 +6,21 @@ import java.io.FileOutputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import discordforrad.LanguageCode;
-import discordforrad.inputUtils.WebpageReader;
+import discordforrad.inputUtils.TextInputUtils;
+import discordforrad.inputUtils.WebScrapping;
+import webscrapping.WebpageReader;
 
 public class Dictionnary {
-	
+
 	private static final Set<LanguageWord> validWordCache = new HashSet<>();
 	private static final Set<LanguageWord> invalidWordCache = new HashSet<>();
 	private static final File DATABASE_VALID = Paths.get("data/cache/valid_words.obj").toFile();
@@ -31,8 +37,8 @@ public class Dictionnary {
 
 		} catch (Exception ex) {
 			ex.printStackTrace();
-        }
-		
+		}
+
 		try {
 			if(DATABASE_INVALID.exists()) {
 				FileInputStream fileIn = new FileInputStream(DATABASE_INVALID);
@@ -44,11 +50,11 @@ public class Dictionnary {
 
 		} catch (Exception ex) {
 			ex.printStackTrace();
-        }
+		}
 	}
-	
-	
-	
+
+
+
 	public static boolean isInDictionnaries(LanguageWord lw)
 	{
 		if(validWordCache.contains(lw))return true;
@@ -61,29 +67,29 @@ public class Dictionnary {
 		else if(lw.getCode().equals(LanguageCode.EN))
 			res = isEnglishWord(lw);
 		else throw new Error();
-		
+
 		if(res) {
 			validWordCache.add(lw);
 			try {
-	            FileOutputStream fileOut = new FileOutputStream(DATABASE_VALID);
-	            ObjectOutputStream objectOut = new ObjectOutputStream(fileOut);
-	            objectOut.writeObject(validWordCache);
-	            objectOut.close(); 
-	        } catch (Exception ex) {
-	            ex.printStackTrace();
-	        }
+				FileOutputStream fileOut = new FileOutputStream(DATABASE_VALID);
+				ObjectOutputStream objectOut = new ObjectOutputStream(fileOut);
+				objectOut.writeObject(validWordCache);
+				objectOut.close(); 
+			} catch (Exception ex) {
+				ex.printStackTrace();
+			}
 		}
 		else
 		{
 			invalidWordCache.add(lw);
 			try {
-	            FileOutputStream fileOut = new FileOutputStream(DATABASE_INVALID);
-	            ObjectOutputStream objectOut = new ObjectOutputStream(fileOut);
-	            objectOut.writeObject(invalidWordCache);
-	            objectOut.close(); 
-	        } catch (Exception ex) {
-	            ex.printStackTrace();
-	        }
+				FileOutputStream fileOut = new FileOutputStream(DATABASE_INVALID);
+				ObjectOutputStream objectOut = new ObjectOutputStream(fileOut);
+				objectOut.writeObject(invalidWordCache);
+				objectOut.close(); 
+			} catch (Exception ex) {
+				ex.printStackTrace();
+			}
 		}
 		return res;
 	}
@@ -96,55 +102,49 @@ public class Dictionnary {
 				lw.getWord().contains("ä")||
 				lw.getWord().contains("Ä")
 				) return false;
-		if(isWordInReferenceWord(lw))
+		if(WebScrapping.isWordInReferenceWord(lw))
 			return true;
-		if(isInBabLaReferenceWord(lw))
+		if(isInBabLaDisctionnary(lw))
 			return true;
-		
+
 		return false;
-		
-		
 	}
 
 	private static boolean isSwedishWord(LanguageWord lw) {
-		if(isWordInReferenceWord(lw))
-			return true;
+		if(true) isInBabLaDisctionnary(lw);
 		
-		if(isInBabLaReferenceWord(lw))
+		
+		if(WebScrapping.isWordInReferenceWord(lw))
+			return true;
+
+		if(isInBabLaDisctionnary(lw))
 			return true;
 		//if(isFolketsLexikonWord(lw))
 		//	return true;
-		
+
 		//System.out.println("Could not find "+lw+" in the dictionnaries. Is it OK?");
 		return false;
-		
+
 	}
 
-	private static boolean isInBabLaReferenceWord(LanguageWord lw) {
-		String header = "https://";
-		
-		String languageInPlainText = null;
+	public static boolean isInBabLaDisctionnary(LanguageWord lw) {
+
+		String webPageContents = WebScrapping.getContentsFromBabLa(lw);
+
 		String otherLanguageInPlainText = null;
 		if(lw.getCode().equals(LanguageCode.EN))
 		{
-			languageInPlainText = "english";
 			otherLanguageInPlainText = "swedish";
 		}
 		if(lw.getCode().equals(LanguageCode.SV))
 		{
-			languageInPlainText = "swedish";
 			otherLanguageInPlainText = "english";
 		}
-		
-		
-		String pageCode = header+"en.bab.la/dictionary/"+languageInPlainText+"-"+otherLanguageInPlainText+
-				"/"+lw.getWord();
-		
-		String webPageContents = WebpageReader.downloadWebPage(pageCode, lw.toString());
+
 		if(webPageContents.toLowerCase()
 				.contains("our team was informed that the translation for \""+lw.getWord()+"\" is missing"))
 			return false;	
-		
+
 		boolean result = webPageContents.toLowerCase().contains("\""+lw.getWord()+"\" in "+otherLanguageInPlainText);
 
 		return result;
@@ -163,31 +163,47 @@ public class Dictionnary {
 		return result;
 	}
 
-	private static boolean isWordInReferenceWord(LanguageWord lw) {
-		String header = "https://";
-		String pageCode = "www.wordreference.com/"+getWordReferenceNameFor(lw.getCode())+"/";
-		String pageToAskFor = header + pageCode+lw.getWord();
-		String webPageContents = WebpageReader.downloadWebPage(pageToAskFor,lw.toString());
-		if(!webPageContents.contains(pageCode))
-			return false;
 
-		boolean result = webPageContents.contains("Matchande uppslagsord från andra sidan av ordboken.")
-				|| webPageContents.contains("is an alternate term for") 
-				|| webPageContents.toLowerCase().contains("principal translations");
-		
-		//System.out.println(webPageContents);
-		/*if(!result)
-			System.out.println("Could not find "+lw+" in the dictionnary. Is it OK?");*/
-		return result;
-	}
+	public static void main(String args[])
+	{
+		Set<LanguageWord> toExplore = new HashSet<>();
+		Set<LanguageWord> explored = new HashSet<>();
+		toExplore.add(LanguageWord.newInstance("beginning", LanguageCode.EN));
 
-	private static String getWordReferenceNameFor(LanguageCode code) {
-		switch (code) {
-		case SV:return "sven";
-		case EN:return "ensv";
-		default:
-			throw new IllegalArgumentException("Unexpected value: " + code);
+		while(!toExplore.isEmpty())
+		{
+			System.out.println("Done:\t\t"+explored.size());
+			System.out.println("Remaining:\t"+toExplore.size()+"\n");
+			
+			LanguageWord next = toExplore.iterator().next();
+			toExplore.remove(next);
+			if(explored.contains(next)) continue;
+			explored.add(next);
+
+
+			String loadingContents = 
+					WebScrapping.getContentsFromBabLa(next) + 
+					WebScrapping.getContentsFromReferenceWord(next);
+
+			Set<LanguageWord> nextSet = 
+					TextInputUtils.toListOfWords(loadingContents)
+			.stream()
+			.map(
+					x->
+					
+					Arrays.asList(
+							LanguageWord.newInstance(x, LanguageCode.EN),
+							LanguageWord.newInstance(x, LanguageCode.SV)
+							)
+					)
+			.reduce(
+					new LinkedList<>(), (x,y)->{x.addAll(y); return x;})
+			.stream()
+			.collect(Collectors.toSet());
+			toExplore.addAll(nextSet);
 		}
 	}
+
+
 
 }

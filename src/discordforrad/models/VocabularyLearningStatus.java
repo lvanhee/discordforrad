@@ -15,15 +15,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
 import discordforrad.AddStringResultContext;
 import discordforrad.LanguageCode;
 import discordforrad.Translator;
 import discordforrad.inputUtils.TextInputUtils;
-import discordforrad.languageModel.Dictionnary;
-import discordforrad.languageModel.LanguageText;
-import discordforrad.languageModel.LanguageWord;
+import discordforrad.models.language.Dictionnary;
+import discordforrad.models.language.LanguageText;
+import discordforrad.models.language.LanguageWord;
 
 public class VocabularyLearningStatus {
 	private static final Path FILEPATH = Paths.get("data/learned_words.txt");
@@ -71,7 +72,7 @@ public class VocabularyLearningStatus {
 	}
 
 
-	public void addFreeString(String lt, AddStringResultContext c, boolean isOriginalString) {
+	public void addFreeString(String lt, AddStringResultContext c, boolean isOriginalString, int recursivityDepth) {
 		Set<String> consideredWords = new HashSet<>();
 		if(!isOriginalString) consideredWords.add(lt);
 		else consideredWords = TextInputUtils.toListOfWords(lt).stream().collect(Collectors.toSet());
@@ -82,24 +83,17 @@ public class VocabularyLearningStatus {
 			for(LanguageCode lc: LanguageCode.values())
 				if(!word.isEmpty())
 					wordsToSearch.add(new LanguageWord(lc, word));
+		
+		AtomicInteger totalProcessed = new AtomicInteger();
+		
+		final Set<LanguageWord> finalWordsToSearch = wordsToSearch.stream().filter(x->!successfulLearningPerWord.containsKey(x)).collect(Collectors.toSet());
 
-		wordsToSearch.stream().filter(x->!successfulLearningPerWord.containsKey(x))
+		finalWordsToSearch.stream()//.filter(x->!successfulLearningPerWord.containsKey(x))
 		.forEach(lw ->
 		{
-			if(successfulLearningPerWord.containsKey(lw))return;
-
-			if(!Dictionnary.isInDictionnaries(lw))
-				return;
-
-			c.addResult(lw);
-			successfulLearningPerWord.put(lw, 0);
-			timeLastAttempt.put(lw, LocalDateTime.MIN);
-
-			for(String translation: Translator.getTranslation(lw.getWord().replaceAll("_", " "), 
-					lw.getCode(), LanguageCode.otherLanguage(lw.getCode())))
-				addFreeString(
-						translation,
-						c, false);
+			System.out.println(totalProcessed+"/"+finalWordsToSearch.size());
+			totalProcessed.incrementAndGet();
+			addWordToSearch(lw, c, recursivityDepth);
 		}
 				);
 
@@ -110,7 +104,30 @@ public class VocabularyLearningStatus {
 
 
 
-	private void updateFile() {
+	private void addWordToSearch(LanguageWord lw, AddStringResultContext c, int recursivityDepth) {
+		if(successfulLearningPerWord.containsKey(lw))return;
+
+		if(!Dictionnary.isInDictionnaries(lw)) { 
+			System.out.println("Not in dictionnaries:"+lw);
+			return;
+		}
+
+		c.addResult(lw);
+		successfulLearningPerWord.put(lw, 0);
+		timeLastAttempt.put(lw, LocalDateTime.MIN);
+
+		if(recursivityDepth>0)
+		{
+		for(String translation: Translator.getTranslation(lw.getWord().replaceAll("_", " "), 
+				lw.getCode(), LanguageCode.otherLanguage(lw.getCode())))
+			addFreeString(
+					translation,
+					c, false,recursivityDepth-1);
+		}
+	}
+
+
+	private synchronized void updateFile() {
 		String res = "";
 		for(LanguageWord s: successfulLearningPerWord.keySet())
 			res+=s.getWord()+";"+s.getCode()+";"+successfulLearningPerWord.get(s)+";"+timeLastAttempt.get(s)+"\n";
@@ -178,13 +195,13 @@ public class VocabularyLearningStatus {
 	}
 
 
-	public void decrementSuccessUpToOne(LanguageWord lastWordAsked) throws IOException {
+	public void decrementSuccessUpToZero(LanguageWord lastWordAsked) throws IOException {
 		timeLastAttempt.put(lastWordAsked, LocalDateTime.now());
 		if(!successfulLearningPerWord.containsKey(lastWordAsked))
 			successfulLearningPerWord.put(lastWordAsked, 0);
 		successfulLearningPerWord.put(lastWordAsked,successfulLearningPerWord.get(lastWordAsked)-1);
-		if(successfulLearningPerWord.get(lastWordAsked)<1)
-			successfulLearningPerWord.put(lastWordAsked,1);
+		if(successfulLearningPerWord.get(lastWordAsked)<0)
+			successfulLearningPerWord.put(lastWordAsked,0);
 		updateFile();
 	}
 
@@ -233,8 +250,10 @@ public class VocabularyLearningStatus {
 
 
 	public List<LanguageWord> getStandardSessionMidTermWordsToLearn() {
+		int nbLearnableMidTerm = getAllMidTermWords().size();
+		int nbToProcess = Math.max(DEFAULT_MID_TERM_WORDS_TO_LEARN_EVERY_SESSION, nbLearnableMidTerm/10);
 		int nbToPick = 
-				Math.min(Math.max(DEFAULT_MID_TERM_WORDS_TO_LEARN_EVERY_SESSION, getLearnableMidTermWords().size()/10),
+				Math.min(nbToProcess,
 						getLearnableMidTermWords().size());
 		
 		
@@ -264,6 +283,16 @@ public class VocabularyLearningStatus {
 	private Set<LanguageWord> getLearnableLongTermWords() {
 		Set<LanguageWord> res = getAllLongTermWords().stream().filter(x->LearningModel.isTimeForLearning(x, this)).collect(Collectors.toSet()); 
 		return res;
+	}
+
+
+	public static long getNumberOfKnownWordsFromWordset(VocabularyLearningStatus vls, LanguageText newInstance) {
+		return newInstance.getSetOfValidWords().stream().filter(x->vls.getAllLongTermWords().contains(x)).count();
+	}
+
+
+	public static long getNumberOfStudiedWordsFromWordset(VocabularyLearningStatus vls, LanguageText newInstance) {
+		return newInstance.getSetOfValidWords().stream().filter(x->vls.getAllWords().contains(x)).count();
 	}
 
 

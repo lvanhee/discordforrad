@@ -12,9 +12,11 @@ import java.util.stream.Collectors;
 import discordforrad.LanguageCode;
 import discordforrad.Translator;
 import discordforrad.discordmanagement.OrdforrAIListener;
-import discordforrad.languageModel.LanguageWord;
 import discordforrad.models.LearningModel;
 import discordforrad.models.VocabularyLearningStatus;
+import discordforrad.models.language.Dictionnary;
+import discordforrad.models.language.LanguageWord;
+import discordforrad.models.language.WordDescription;
 import discordforrad.models.learning.focus.ReadThroughFocus;
 
 public class EntryDrivenSMLLearningSession {
@@ -38,6 +40,11 @@ public class EntryDrivenSMLLearningSession {
 
 	private EntryDrivenSMLLearningSession(ReadThroughFocus currentFocus, 
 			VocabularyLearningStatus vls) {
+		
+		vls.getAllWords().stream()
+		.sorted((x,y)->x.toString().compareTo(y.toString()))
+		//.collect(Collectors.toSet())
+		.forEach(x->Dictionnary.isInBabLaDisctionnary(x));
 
 		List<LanguageWord> allWords = currentFocus.getAllValidSortedWords();
 		
@@ -65,7 +72,7 @@ public class EntryDrivenSMLLearningSession {
 
 		shortTermWordsToTeachInThisSession = shortList.subList(0, Math.min(20, shortList.size()));
 		midTermWordsToTeachInThisSession = vls.getStandardSessionMidTermWordsToLearn();
-		longTermWordsToTeachInThisSession = vls.getStandardSessionLongTermWordsToLearn();
+		longTermWordsToTeachInThisSession = vls.getStandardSessionLongTermWordsToLearn().subList(0, 10);
 		
 		isFocusFullyCompleted = shortTermWordsToTeachInThisSession.isEmpty() &&
 				midTermWordsToTeachInThisSession.isEmpty() &&

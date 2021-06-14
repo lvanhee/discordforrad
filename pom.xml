@@ -19,10 +19,16 @@
 	</build>
 	<dependencies>
 		<dependency>
+			<groupId>webscrapping</groupId>
+  			<artifactId>webscrapping</artifactId>
+  			<version>0.0.1-SNAPSHOT</version>
+		</dependency>
+		<dependency>
 			<groupId>net.dv8tion</groupId>
 			<artifactId>JDA</artifactId>
 			<version>4.2.1_255</version>
 		</dependency>
+		
 		<dependency>
 			<groupId>net.sourceforge.htmlunit</groupId>
 			<artifactId>htmlunit</artifactId>

@@ -11,6 +11,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import discordforrad.inputUtils.TextInputUtils;
+import discordforrad.models.language.LanguageWord;
 
 public class Translator {
 	
@@ -66,5 +67,12 @@ public class Translator {
 
 	public static String translate(String languageText, LanguageCode sv, LanguageCode en) {
 		return translate(sv.toString().toLowerCase(), en.toString().toLowerCase(), languageText);
+	}
+
+	public static Set<String> getTranslation(LanguageWord word) {
+		return getTranslation(
+				word.getWord(),
+				word.getCode(), 
+				LanguageCode.otherLanguage(word.getCode()));
 	}
 }

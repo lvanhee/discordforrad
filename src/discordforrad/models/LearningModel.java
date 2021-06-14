@@ -5,7 +5,7 @@ import java.time.LocalDateTime;
 import java.time.temporal.TemporalAmount;
 import java.util.stream.Collectors;
 
-import discordforrad.languageModel.LanguageWord;
+import discordforrad.models.language.LanguageWord;
 
 public class LearningModel {
 
@@ -29,7 +29,7 @@ public class LearningModel {
 	private static TemporalAmount getTimeBetweenIncrementsForLearning(int numberOfSuccessLearning) {
 		if(numberOfSuccessLearning==0) return Duration.ZERO;
 		if(numberOfSuccessLearning==1) return Duration.ofHours(6);
-		if(numberOfSuccessLearning<7)
+		if(numberOfSuccessLearning<=7)
 			return Duration.ofDays(numberOfSuccessLearning-1);
 		else
 			return Duration.ofDays(numberOfSuccessLearning*numberOfSuccessLearning);
