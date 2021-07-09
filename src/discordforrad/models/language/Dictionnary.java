@@ -2,7 +2,9 @@ package discordforrad.models.language;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.nio.file.Paths;
@@ -102,6 +104,8 @@ public class Dictionnary {
 				lw.getWord().contains("ä")||
 				lw.getWord().contains("Ä")
 				) return false;
+		isInBabLaDisctionnary(lw);
+
 		if(WebScrapping.isWordInReferenceWord(lw))
 			return true;
 		if(isInBabLaDisctionnary(lw))
@@ -112,8 +116,8 @@ public class Dictionnary {
 
 	private static boolean isSwedishWord(LanguageWord lw) {
 		if(true) isInBabLaDisctionnary(lw);
-		
-		
+
+
 		if(WebScrapping.isWordInReferenceWord(lw))
 			return true;
 
@@ -166,15 +170,22 @@ public class Dictionnary {
 
 	public static void main(String args[])
 	{
-		Set<LanguageWord> toExplore = new HashSet<>();
-		Set<LanguageWord> explored = new HashSet<>();
+		Set<LanguageWord> toExplore = (Set) getFromFile("data/cache/all_words_to_explore.obj");
+		Set<LanguageWord> explored = (Set) getFromFile("data/cache/all_explored_words.obj");
+		if(toExplore.isEmpty())
+		{
+			toExplore.add(new LanguageWord(LanguageCode.EN, "start"));
+			explored.clear();
+		}
+
+
 		toExplore.add(LanguageWord.newInstance("beginning", LanguageCode.EN));
 
 		while(!toExplore.isEmpty())
 		{
 			System.out.println("Done:\t\t"+explored.size());
 			System.out.println("Remaining:\t"+toExplore.size()+"\n");
-			
+
 			LanguageWord next = toExplore.iterator().next();
 			toExplore.remove(next);
 			if(explored.contains(next)) continue;
@@ -185,23 +196,67 @@ public class Dictionnary {
 					WebScrapping.getContentsFromBabLa(next) + 
 					WebScrapping.getContentsFromReferenceWord(next);
 
+			MP3Loader.getFluxFromBabLa(next);
+
 			Set<LanguageWord> nextSet = 
 					TextInputUtils.toListOfWords(loadingContents)
-			.stream()
-			.map(
-					x->
-					
-					Arrays.asList(
-							LanguageWord.newInstance(x, LanguageCode.EN),
-							LanguageWord.newInstance(x, LanguageCode.SV)
+					.stream()
+					.map(
+							x->
+
+							Arrays.asList(
+									LanguageWord.newInstance(x, LanguageCode.EN),
+									LanguageWord.newInstance(x, LanguageCode.SV)
+									)
 							)
-					)
-			.reduce(
-					new LinkedList<>(), (x,y)->{x.addAll(y); return x;})
-			.stream()
-			.collect(Collectors.toSet());
+					.reduce(
+							new LinkedList<>(), (x,y)->{x.addAll(y); return x;})
+					.stream()
+					.filter(x->!explored.contains(x))
+					.collect(Collectors.toSet());
 			toExplore.addAll(nextSet);
+
+			if(explored.size()%200==0)
+			{
+				saveToFile("data/cache/all_words_to_explore.obj",toExplore);
+				saveToFile("data/cache/all_explored_words.obj",explored);
+			}
 		}
+	}
+
+	private static void saveToFile(String string, Set<LanguageWord> toExplore) {
+		try {
+			FileOutputStream file = new FileOutputStream(string);
+			ObjectOutputStream output = new ObjectOutputStream(file);
+			output.writeObject(toExplore);
+			output.close();
+			file.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+			throw new Error();
+		}
+	}
+	
+	private static Object getFromFile(String s)
+	{
+		try {
+			FileInputStream fis = new FileInputStream(s);
+			ObjectInputStream ois = new ObjectInputStream(fis);
+			return ois.readObject();
+		} catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			return new HashSet<>();
+		} catch (ClassNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		throw new Error();
+		
 	}
 
 

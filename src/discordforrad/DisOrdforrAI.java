@@ -15,6 +15,7 @@ import discordforrad.inputUtils.RawLearningTextDatabaseManager;
 import discordforrad.inputUtils.TextInputUtils;
 import discordforrad.models.LearningModel;
 import discordforrad.models.VocabularyLearningStatus;
+import discordforrad.models.VocabularyLearningStatus.LearningStatus;
 import discordforrad.models.language.Dictionnary;
 import discordforrad.models.language.LanguageText;
 import discordforrad.models.language.LanguageWord;
@@ -50,22 +51,24 @@ public enum DisOrdforrAI {
 			INSTANCE.displayStatistics();
 			return;		
 		}
-		
+
 		LanguageWord currentWordToAsk = currentSession.getNextWord();
-		
+
 		lastWordAsked = currentWordToAsk;
-		
+
 
 		LanguageCode translateTo = LanguageCode.EN;
 		if(lastWordAsked.getCode()==LanguageCode.EN) translateTo = LanguageCode.SV;
 
 		WordDescription description = WordDescription.getDescriptionFor(currentWordToAsk);
-		
+
 
 		String toAsk = "**"+lastWordAsked.getCode()+"\t"+lastWordAsked.getWord()+"\t"+
-		vls.getNumberOfSuccessLearning(lastWordAsked)+"\t"+
-		currentSession.getStatisticsOnRemainingToLearn()+"**";
+				vls.getNumberOfSuccessLearning(lastWordAsked)+"\t"+
+				currentSession.getStatisticsOnRemainingToLearn()+"**";
 		
+		OrdforrAIListener.playSoundFor(currentWordToAsk);
+
 		OrdforrAIListener.discussionChannel.sendMessage(toAsk).queue();
 		OrdforrAIListener.print(description);
 
@@ -74,8 +77,8 @@ public enum DisOrdforrAI {
 	public void displayStatistics() {
 
 		for(LanguageText lt: currentFocus.getLanguageTextList())
-		discordforrad.discordmanagement.OrdforrAIListener
-		.printWithEmphasisOnWords(lt, vls);
+			discordforrad.discordmanagement.OrdforrAIListener
+			.printWithEmphasisOnWords(lt, vls);
 
 		int vocabularySize = vls.getAllWords().size();
 		int shortTerm = vls.getAllShortTermWords().size();
@@ -112,13 +115,20 @@ public enum DisOrdforrAI {
 
 			int masteredTexts = currentFocus.getAllMasteredTexts(vls.getAllLongTermWords()).size();
 
-			
+
 
 			OrdforrAIListener.discussionChannel.sendMessage("In the current focus, there are: "
 					+shortTermT+" words unexplored; "
 					+midTermT+" words being learned and "
 					+longTermT+" words mastered; for a total of "+
 					ratioMastery +" mastered texts\n").queue();
+			
+			
+			List<LanguageWord> lw = currentFocus.getLanguageTextList().get(0).getListOfValidWords().stream()
+					.filter(x->Dictionnary.isInDictionnaries(x))
+					.filter(x->!vls.getLearningStatus(x).equals(LearningStatus.LEARNED))
+					.collect(Collectors.toList());
+			OrdforrAIListener.print(lw.toString());
 		}
 
 	}
@@ -150,7 +160,7 @@ public enum DisOrdforrAI {
 
 
 	public void addFreeString(String languageText, AddStringResultContext c) {
-		
+
 		discordforrad.discordmanagement.OrdforrAIListener.printWithEmphasisOnWords(
 				LanguageText.newInstance(LanguageCode.SV, languageText), vls);
 
@@ -160,51 +170,51 @@ public enum DisOrdforrAI {
 			discordforrad.discordmanagement.OrdforrAIListener.discussionChannel.sendMessage("Text too long to be translated").queue();
 
 		Runnable r = ()->{
-			
+
 			long nbShortTermBefore = vls.getAllShortTermWords().parallelStream().filter(x->c.getWords().contains(x)).count();
-		
+
 			vls.addFreeString(languageText,c, true,1);
-			
-		String index = RawLearningTextDatabaseManager.add(languageText);
 
-		long nbShortTerm = vls.getAllShortTermWords().parallelStream().filter(x->c.getWords().contains(x)).count();
-		long nbMidTerm = vls.getAllMidTermWords().parallelStream().filter(x->c.getWords().contains(x)).count();
-		long nbLongTerm = vls.getAllLongTermWords().parallelStream().filter(x->c.getWords().contains(x)).count();
+			String index = RawLearningTextDatabaseManager.add(languageText);
 
-		List<String> l = TextInputUtils.toListOfWords(languageText);
-		Set<String> allWords = l.stream().collect(Collectors.toSet());
-		long nbShortTermT = vls.getAllShortTermWords().parallelStream().filter(x->allWords.contains(x.getWord())).count();
-		long nbMidTermT = vls.getAllMidTermWords().parallelStream().filter(x->allWords.contains(x.getWord())).count();
-		long nbLongTermT = vls.getAllLongTermWords().parallelStream().filter(x->allWords.contains(x.getWord())).count();
+			long nbShortTerm = vls.getAllShortTermWords().parallelStream().filter(x->c.getWords().contains(x)).count();
+			long nbMidTerm = vls.getAllMidTermWords().parallelStream().filter(x->c.getWords().contains(x)).count();
+			long nbLongTerm = vls.getAllLongTermWords().parallelStream().filter(x->c.getWords().contains(x)).count();
 
-		//		discordforrad.discordmanagement.OrdforrAIListener.discussionChannel.sendMessage("Added "+c.getWords().size()+" new words: "+c.getWords()).queue();
+			List<String> l = TextInputUtils.toListOfWords(languageText);
+			Set<String> allWords = l.stream().collect(Collectors.toSet());
+			long nbShortTermT = vls.getAllShortTermWords().parallelStream().filter(x->allWords.contains(x.getWord())).count();
+			long nbMidTermT = vls.getAllMidTermWords().parallelStream().filter(x->allWords.contains(x.getWord())).count();
+			long nbLongTermT = vls.getAllLongTermWords().parallelStream().filter(x->allWords.contains(x.getWord())).count();
 
-		
-		String statistics = "The text lead to the inclusion of "+c.getWords().size()
-				+" new words.\n"
-				;
-		
+			//		discordforrad.discordmanagement.OrdforrAIListener.discussionChannel.sendMessage("Added "+c.getWords().size()+" new words: "+c.getWords()).queue();
 
-		String toPrint = c.getWords()+"\n"+statistics;
-		
-		while(toPrint.length()>2000)
-		{
-			String toPrintNow = toPrint.substring(0,2000);
-			toPrint = toPrint.substring(2000);
-			discordforrad.discordmanagement.OrdforrAIListener.discussionChannel.sendMessage(toPrintNow).queue();
-		}
-		
-		if(languageText.length()<2000)
-			discordforrad.discordmanagement.OrdforrAIListener.discussionChannel.sendMessage(Translator.translate(languageText, LanguageCode.SV, LanguageCode.EN)).queue();
-		else
-			discordforrad.discordmanagement.OrdforrAIListener.discussionChannel.sendMessage("Text too long to be translated").queue();
-		
-		discordforrad.discordmanagement.OrdforrAIListener.discussionChannel.sendMessage(toPrint).queue();
 
-		discordforrad.discordmanagement.OrdforrAIListener.discussionChannel.sendMessage("The text contains "+l.size()+" words; "+allWords.size()
-		+" different words among which "+nbShortTermT+" are new; "+nbMidTermT+" are being assimilated and "+nbLongTermT+" have been been validated").queue();
+			String statistics = "The text lead to the inclusion of "+c.getWords().size()
+					+" new words.\n"
+					;
 
-		discordforrad.discordmanagement.OrdforrAIListener.discussionChannel.sendMessage("The name of this entry is: "+index).queue();
+
+			String toPrint = c.getWords()+"\n"+statistics;
+
+			while(toPrint.length()>2000)
+			{
+				String toPrintNow = toPrint.substring(0,2000);
+				toPrint = toPrint.substring(2000);
+				discordforrad.discordmanagement.OrdforrAIListener.discussionChannel.sendMessage(toPrintNow).queue();
+			}
+
+			if(languageText.length()<2000)
+				discordforrad.discordmanagement.OrdforrAIListener.discussionChannel.sendMessage(Translator.translate(languageText, LanguageCode.SV, LanguageCode.EN)).queue();
+			else
+				discordforrad.discordmanagement.OrdforrAIListener.discussionChannel.sendMessage("Text too long to be translated").queue();
+
+			discordforrad.discordmanagement.OrdforrAIListener.discussionChannel.sendMessage(toPrint).queue();
+
+			discordforrad.discordmanagement.OrdforrAIListener.discussionChannel.sendMessage("The text contains "+l.size()+" words; "+allWords.size()
+			+" different words among which "+nbShortTermT+" are new; "+nbMidTermT+" are being assimilated and "+nbLongTermT+" have been been validated").queue();
+
+			discordforrad.discordmanagement.OrdforrAIListener.discussionChannel.sendMessage("The name of this entry is: "+index).queue();
 
 		};
 		new Thread(r).start();
@@ -223,7 +233,7 @@ public enum DisOrdforrAI {
 
 
 	public void setFocus(ReadThroughFocus f) {
-	/*	this.currentFocus = f;
+		/*	this.currentFocus = f;
 		ReadThroughFocus.saveFocusOnFile(f);
 
 		OrdforrAIListener.discussionChannel.sendMessage("Updated focus to learning vocabulary for reading through entry: "+f.getIndex()).queue();

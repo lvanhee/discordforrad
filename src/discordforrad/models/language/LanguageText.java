@@ -47,7 +47,6 @@ public class LanguageText {
 	public List<LanguageWord> getListOfValidWords() {
 		
 		return TextInputUtils.toListOfWords(text).stream()
-				.sorted()
 				.map(x->LanguageWord.newInstance(x, lc))
 				.filter(x->Dictionnary.isInDictionnaries(x))
 				.collect(Collectors.toList());

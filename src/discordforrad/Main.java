@@ -22,6 +22,7 @@ public class Main {
 	static {
 		String token;
 		try {
+		//	System.setProperty("java.library.path", "C:/Users/loisv/Downloads/mpg123-1.28.0-x86-64/mpg123-1.28.0-x86-64/libmpg123-0.dll");
 			token = Files.readString(Paths.get("data/auth/discord_token.txt"));
 			jda = JDABuilder.createLight(token).build();
 			jda.getPresence().setStatus(OnlineStatus.ONLINE);

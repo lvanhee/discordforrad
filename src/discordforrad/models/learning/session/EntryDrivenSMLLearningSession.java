@@ -41,10 +41,10 @@ public class EntryDrivenSMLLearningSession {
 	private EntryDrivenSMLLearningSession(ReadThroughFocus currentFocus, 
 			VocabularyLearningStatus vls) {
 		
-		vls.getAllWords().stream()
+		/*vls.getAllWords().stream()
 		.sorted((x,y)->x.toString().compareTo(y.toString()))
 		//.collect(Collectors.toSet())
-		.forEach(x->Dictionnary.isInBabLaDisctionnary(x));
+		.forEach(x->Dictionnary.isInBabLaDisctionnary(x));*/
 
 		List<LanguageWord> allWords = currentFocus.getAllValidSortedWords();
 		

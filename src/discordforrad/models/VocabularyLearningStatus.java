@@ -35,12 +35,23 @@ public class VocabularyLearningStatus {
 	private static final int DEFAULT_LONG_TERM_WORDS_TO_LEARN_EVERY_SESSION = 10;
 	private final Map<LanguageWord, Integer> successfulLearningPerWord;
 	private final Map<LanguageWord, LocalDateTime> timeLastAttempt;
+	
+	public enum LearningStatus {IN_ACQUISITION, IN_CONSOLIDATION, LEARNED}
 
 
 	public VocabularyLearningStatus(
 			Map<LanguageWord, Integer> m, 
 			Map<LanguageWord, LocalDateTime> m2)
 	{
+		Set<LanguageWord>toRemove = new HashSet<>();
+		for(LanguageWord lw:m.keySet())
+			if(!Dictionnary.isInDictionnaries(lw))
+			{
+				System.out.println("REMOVING:"+lw);
+				toRemove.add(lw);
+			}
+		
+		for(LanguageWord lw:toRemove)m.remove(lw);
 		this.successfulLearningPerWord = m;
 		this.timeLastAttempt = m2;
 	}
@@ -293,6 +304,18 @@ public class VocabularyLearningStatus {
 
 	public static long getNumberOfStudiedWordsFromWordset(VocabularyLearningStatus vls, LanguageText newInstance) {
 		return newInstance.getSetOfValidWords().stream().filter(x->vls.getAllWords().contains(x)).count();
+	}
+
+
+	public LearningStatus getLearningStatus(LanguageWord x) {
+		if(isShortTermWord(x))
+			return LearningStatus.IN_ACQUISITION;
+		if(isMidTermWord(x))
+			return LearningStatus.IN_CONSOLIDATION;
+		if(isLongTermWord(x))
+			return LearningStatus.LEARNED;
+		
+		throw new Error();
 	}
 
 

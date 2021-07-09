@@ -1,6 +1,7 @@
 package discordforrad.discordmanagement;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.Collections;
@@ -8,13 +9,28 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
+import com.sedmelluq.discord.lavaplayer.container.mp3.Mp3AudioTrack;
+import com.sedmelluq.discord.lavaplayer.player.AudioLoadResultHandler;
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayer;
+import com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager;
+import com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager;
+import com.sedmelluq.discord.lavaplayer.player.FunctionalResultHandler;
+import com.sedmelluq.discord.lavaplayer.source.AudioSourceManagers;
+import com.sedmelluq.discord.lavaplayer.source.local.LocalSeekableInputStream;
+import com.sedmelluq.discord.lavaplayer.track.AudioReference;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import com.sedmelluq.discord.lavaplayer.track.BaseAudioTrack;
+
 import discordforrad.AddStringResultContext;
 import discordforrad.DisOrdforrAI;
 import discordforrad.LanguageCode;
 import discordforrad.Main;
 import discordforrad.Translator;
+import discordforrad.discordmanagement.audio.PlayerManager;
 import discordforrad.inputUtils.TextInputUtils;
 import discordforrad.models.VocabularyLearningStatus;
+import discordforrad.models.language.Dictionnary;
 import discordforrad.models.language.LanguageText;
 import discordforrad.models.language.LanguageWord;
 import discordforrad.models.language.StringPair;
@@ -22,31 +38,71 @@ import discordforrad.models.language.WordDescription;
 import discordforrad.models.learning.focus.ReadThroughFocus;
 import net.dv8tion.jda.api.entities.Message.Attachment;
 import net.dv8tion.jda.api.entities.TextChannel;
+import net.dv8tion.jda.api.entities.VoiceChannel;
 import net.dv8tion.jda.api.events.message.guild.GuildMessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
+import net.dv8tion.jda.api.managers.AudioManager;
 
 public class OrdforrAIListener extends ListenerAdapter {
 
 
 	public static TextChannel discussionChannel = null;
+	//private static final AudioPlayer player;
 	static {
 		OrdforrAIListener.discussionChannel = 
 				//jda.getCategories().get(0).getChannels().get(0);
 				Main.jda.getTextChannelsByName("main", true).get(0);
-		if(OrdforrAIListener.discussionChannel.canTalk()) {
-			OrdforrAIListener.discussionChannel.sendMessage("AI ready").queue();
-		}
+		OrdforrAIListener.discussionChannel.sendMessage("AI ready").queue();
+
+		VoiceChannel channel = Main.jda.getVoiceChannelByName("audio", false).iterator().next();
+
+		AudioPlayerManager playerManager = new DefaultAudioPlayerManager();
+		AudioSourceManagers.registerRemoteSources(playerManager);
+		
+		LocalSeekableInputStream localStream = new LocalSeekableInputStream(
+				new File("C:\\Users\\loisv\\Downloads\\binary.mp3"));
+		AudioTrack at = new Mp3AudioTrack(new AudioTrackInfo("", "", 1000, "", true, ""), localStream);
+	//	AudioLoadResultHandler load = new FunctionalResultHandler(trackConsumer, playlistConsumer, emptyResultHandler, exceptionConsumer)
+		
+	//	playerManager.loadItem(reference, resultHandler)
+	//	player = playerManager.createPlayer();
+		
+		
+		AudioManager manager = Main.jda.getGuilds().get(0).getAudioManager();
+		// MySendHandler should be your AudioSendHandler implementation
+		//manager.setSendingHandler(new MySendHandler(player));
+	
+		//       player.playTrack(track);
+		// Here we finally connect to the target voice channel 
+		// and it will automatically start pulling the audio from the MySendHandler instance
+		manager.openAudioConnection(channel);
+		
+	//	player.playTrack(at);
+	//	player.startTrack(at, true);
+		
+		/*playerManager.loadItem("C:\\Users\\loisv\\Downloads\\binary.mp3", 
+				new FunctionalResultHandler(track -> player.playTrack(track),
+                        null, null, null));*/
+
+		System.out.println("end");
+		
+		PlayerManager.getInstance()
+        .loadAndPlay(OrdforrAIListener.discussionChannel, 
+        		//"data/cache/mp3/ENaccommodation.mp3"
+        		"https://www.youtube.com/watch?v=JiF3pbvR5G0"
+        		);
+
 	}
 
 	public void onGuildMessageReceived(GuildMessageReceivedEvent event) {		
 		if (event.getMessage().getContentRaw().equals("y")) {
-				DisOrdforrAI.INSTANCE.confirm(false);
+			DisOrdforrAI.INSTANCE.confirm(false);
 		}else if (event.getMessage().getContentRaw().equals("Y")) {
-				DisOrdforrAI.INSTANCE.confirm(true);
+			DisOrdforrAI.INSTANCE.confirm(true);
 		}
 		else if (event.getMessage().getContentRaw().equals("/new-session")) {
-				DisOrdforrAI.INSTANCE.startNewSession();
-			
+			DisOrdforrAI.INSTANCE.startNewSession();
+
 		}
 		else
 			if (event.getMessage().getContentRaw().equalsIgnoreCase("n")) {	
@@ -63,12 +119,12 @@ public class OrdforrAIListener extends ListenerAdapter {
 				String[] bits = message.split(" "); 
 				DisOrdforrAI.INSTANCE.setFocus(
 						ReadThroughFocus.newInstance(bits[1], 
-						LanguageCode.valueOf(bits[2])));
+								LanguageCode.valueOf(bits[2])));
 			}
 			else
 			{
 				AddStringResultContext c = new AddStringResultContext(
-					x->{}//event.getChannel().sendMessage("Adding "+ x).queue()
+						x->{}//event.getChannel().sendMessage("Adding "+ x).queue()
 						);
 				if(!event.getAuthor().isBot()) {
 					if(event.getMessage().getAttachments().size()>0)
@@ -103,7 +159,7 @@ public class OrdforrAIListener extends ListenerAdapter {
 				String line = null;
 				while((line = br.readLine()) != null)
 					total+=line+"\n";
-				
+
 				DisOrdforrAI.INSTANCE.addFreeString(total, c);
 				br.close();
 			} catch (InterruptedException | ExecutionException e) {
@@ -115,7 +171,7 @@ public class OrdforrAIListener extends ListenerAdapter {
 	}
 
 	public static void printWithEmphasisOnWords(LanguageText lt, VocabularyLearningStatus vls) {
-		
+
 		String raw = lt.getText();
 		LanguageCode languageCode = lt.getLanguageCode();
 		String res = "";
@@ -131,19 +187,19 @@ public class OrdforrAIListener extends ListenerAdapter {
 			{
 				if(!currentString.isEmpty())
 				{
-					if(vls.isShortTermWord(LanguageWord.newInstance(currentString, languageCode)))
+					LanguageWord lw = LanguageWord.newInstance(currentString, languageCode);
+					if(vls.isLongTermWord(lw)||!Dictionnary.isInDictionnaries(lw))
+					res+="***"+currentString+"***";
+					else if(vls.isShortTermWord(lw))
 						res+="*"+currentString+"*";
-					else if(vls.isMidTermWord(LanguageWord.newInstance(currentString, languageCode)))
+					else if(vls.isMidTermWord(lw))
 						res+="**"+currentString+"**";
-					else if(vls.isLongTermWord(LanguageWord.newInstance(currentString, languageCode)))
-						res+="***"+currentString+"***";
 					currentString="";
 				}
 				res+= raw.charAt(i);
-				
 			}	
 		}
-		
+
 		if(!currentString.isEmpty())
 		{
 			if(vls.isShortTermWord(LanguageWord.newInstance(currentString, languageCode)))
@@ -153,7 +209,7 @@ public class OrdforrAIListener extends ListenerAdapter {
 			else if(vls.isLongTermWord(LanguageWord.newInstance(currentString, languageCode)))
 				res+="***"+currentString+"***";
 		}
-		
+
 		while(res.length()>1000)
 		{
 			String toPrint = res.substring(0, 1000);
@@ -161,11 +217,11 @@ public class OrdforrAIListener extends ListenerAdapter {
 			int indexSplit = res.indexOf(".")+1;
 			toPrint+=res.substring(0,indexSplit);
 			res = res.substring(indexSplit);
-			OrdforrAIListener.discussionChannel.sendMessage(toPrint).queue();
+			OrdforrAIListener.print(toPrint);
 		}
 		try {
-		if(!res.isEmpty())
-			OrdforrAIListener.discussionChannel.sendMessage(res).queue();
+			if(!res.isEmpty())
+				OrdforrAIListener.print(res);
 		}
 		catch(IllegalStateException e)
 		{
@@ -175,23 +231,21 @@ public class OrdforrAIListener extends ListenerAdapter {
 
 	public static void print(WordDescription description) {
 		String toPrint = "";
-		
 		String translationText = "";
-		
 
 		for(String s:description.getTranslations())
 		{
 			translationText+=s+"\n";
 		}
-		
-		
+
+
 		toPrint+=translationText+"\n\n";
-		
+
 		List<StringPair> contextSentences = 
 				description.getContextSentences().stream()
 				.collect(Collectors.toList());
 		Collections.shuffle(contextSentences);
-		
+
 		for(int i = 0 ; i < 5 && i<contextSentences.size() ; i++)
 		{
 			StringPair p = contextSentences.get(i);
@@ -200,15 +254,20 @@ public class OrdforrAIListener extends ListenerAdapter {
 					+"\n"
 					+p.getRight()+"\n\n";
 		}
-		
+
 		toPrint  = toPrint.substring(0,toPrint.length()-2);
 		if(toPrint.length()>2000)
 			toPrint = toPrint.substring(0,1980);
 		print("||"+toPrint+"||");
 	}
 
-	private static void print(String toPrint) {
+	public static void print(String toPrint) {
+		if(toPrint.isBlank())return;
 		OrdforrAIListener.discussionChannel.sendMessage(toPrint).queue();
+	}
+
+	public static void playSoundFor(LanguageWord currentWordToAsk) {
+		//throw new Error();
 	}
 
 }

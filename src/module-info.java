@@ -10,4 +10,5 @@ module discordforrad {
 	requires htmlunit;
 	requires java.logging;
 	requires webscrapping;
+	requires lavaplayer;
 }

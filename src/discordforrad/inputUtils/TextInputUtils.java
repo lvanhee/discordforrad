@@ -36,10 +36,10 @@ public class TextInputUtils {
 	
 	public static String clearOfSymbols(String string) {
 		
-		Set<Character> allowedChar = new HashSet<>();
+//		Set<Character> allowedChar = new HashSet<>();
 		
 		
-		char c = (char)160;
+		/*char c = (char)160;
 		string = string.replaceAll(c+"", "");
 		string = string.replaceAll("\t", "");
 		string = string.replaceAll(",", " ");
@@ -72,10 +72,13 @@ public class TextInputUtils {
 		string = string.replaceAll("–", " ");
 		string = string.replaceAll("&", " ");
 		string = string.replaceAll("[0-9]", "");
-		while(string.contains("  "))
-			string = string.replaceAll("  ", " ");
+		*/
 
-		return string;
+		String res = string.replaceAll("[^\\p{L}]", " ");
+		
+		while(res.contains("  "))
+			res = res.replaceAll("  ", " ");
+		return res;
 	}
 
 }
