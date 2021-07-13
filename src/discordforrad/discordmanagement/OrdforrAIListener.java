@@ -5,7 +5,11 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
@@ -34,7 +38,9 @@ import discordforrad.models.language.Dictionnary;
 import discordforrad.models.language.LanguageText;
 import discordforrad.models.language.LanguageWord;
 import discordforrad.models.language.StringPair;
+import discordforrad.models.language.TranslationDescription;
 import discordforrad.models.language.WordDescription;
+import discordforrad.models.language.WordDescription.WordType;
 import discordforrad.models.learning.focus.ReadThroughFocus;
 import net.dv8tion.jda.api.entities.Message.Attachment;
 import net.dv8tion.jda.api.entities.TextChannel;
@@ -230,12 +236,51 @@ public class OrdforrAIListener extends ListenerAdapter {
 	}
 
 	public static void print(WordDescription description) {
-		String toPrint = "";
+		String toPrint = "";//description.toString();
 		String translationText = "";
-
-		for(String s:description.getTranslations())
+		
+		List<TranslationDescription> translations = description.getTranslations();
+		
+		Map<LanguageText, Set<TranslationDescription.Origin>> countPerTranslation = new HashMap<>();
+		for(TranslationDescription td: translations)
 		{
-			translationText+=s+"\n";
+			if(! countPerTranslation.containsKey(td.getTranslatedText())) countPerTranslation.put(td.getTranslatedText(), new HashSet<>());
+			countPerTranslation.get(td.getTranslatedText()).add(td.getOriginOfTranslation());
+		}
+		
+		List<LanguageText> textSortedByNumberOfOccurrences = countPerTranslation.keySet().stream()
+		.sorted((x,y)->-Integer.compare(countPerTranslation.get(x).size(), countPerTranslation.get(y).size()))
+		.collect(Collectors.toList());
+		
+		for(LanguageText currentText:textSortedByNumberOfOccurrences)
+		{
+			Set<TranslationDescription> translationsOfTheCurrentText = 
+					translations.stream()
+					.filter(x->x.getTranslatedText().equals(currentText))
+					.collect(Collectors.toSet());
+			
+			Set<String> translationOfTheCurrentTextWithAdvancedDescription = 
+					translationsOfTheCurrentText.stream().filter(x->!x.getAdvancedDescription().isBlank())
+					.map(x->x.getAdvancedDescription())
+					.collect(Collectors.toSet());
+			
+			Set<WordDescription.WordType> allTypes = translationsOfTheCurrentText.stream()
+					.map(x->x.getWordType())
+					.collect(Collectors.toSet());
+			
+			allTypes.remove(WordDescription.WordType.UNDEFINED);
+		/*	WordType officialType = WordType.UNDEFINED;
+			if(allTypes.size()>1) throw new Error();
+			if(allTypes.size() == 1) officialType = allTypes.iterator().next();*/
+			String typeString = allTypes.toString();
+			translationText+=currentText.getText()+" "+typeString.substring(1,typeString.length()-1);
+			for(String advanced : translationOfTheCurrentTextWithAdvancedDescription)
+				translationText=translationText + " "+advanced;
+			translationText+=" ("+countPerTranslation.get(currentText)+")\n";
+			/*for(TranslationDescription currentDescription:translations))
+			{
+				translationText+=s+"\n";
+			}*/
 		}
 
 

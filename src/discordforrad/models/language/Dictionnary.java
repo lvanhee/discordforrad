@@ -118,7 +118,7 @@ public class Dictionnary {
 		if(true) isInBabLaDisctionnary(lw);
 
 
-		if(WebScrapping.isWordInReferenceWord(lw))
+		if(isInWordReferenceDictionnary(lw))
 			return true;
 
 		if(isInBabLaDisctionnary(lw))
@@ -257,6 +257,10 @@ public class Dictionnary {
 		
 		throw new Error();
 		
+	}
+
+	public static boolean isInWordReferenceDictionnary(LanguageWord lw) {
+		return WebScrapping.isWordInReferenceWord(lw);
 	}
 
 

@@ -138,7 +138,7 @@ public class WebScrapping {
 		if(!webPageContents.contains(getWordReferenceWebPageName(lw)))
 			return false;
 
-		boolean result = webPageContents.contains("Matchande uppslagsord från andra sidan av ordboken.")
+		boolean result = webPageContents.contains("Huvudsakliga översättningar")
 				|| webPageContents.contains("is an alternate term for") 
 				|| webPageContents.toLowerCase().contains("principal translations");
 		
