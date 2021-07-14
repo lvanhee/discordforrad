@@ -71,26 +71,30 @@ public class Dictionnary {
 		else throw new Error();
 
 		if(res) {
-			validWordCache.add(lw);
-			try {
-				FileOutputStream fileOut = new FileOutputStream(DATABASE_VALID);
-				ObjectOutputStream objectOut = new ObjectOutputStream(fileOut);
-				objectOut.writeObject(validWordCache);
-				objectOut.close(); 
-			} catch (Exception ex) {
-				ex.printStackTrace();
+			synchronized (validWordCache) {
+				validWordCache.add(lw);
+				try {
+					FileOutputStream fileOut = new FileOutputStream(DATABASE_VALID);
+					ObjectOutputStream objectOut = new ObjectOutputStream(fileOut);
+					objectOut.writeObject(validWordCache);
+					objectOut.close(); 
+				} catch (Exception ex) {
+					ex.printStackTrace();
+				}
 			}
 		}
 		else
 		{
-			invalidWordCache.add(lw);
-			try {
-				FileOutputStream fileOut = new FileOutputStream(DATABASE_INVALID);
-				ObjectOutputStream objectOut = new ObjectOutputStream(fileOut);
-				objectOut.writeObject(invalidWordCache);
-				objectOut.close(); 
-			} catch (Exception ex) {
-				ex.printStackTrace();
+			synchronized (invalidWordCache) {			
+				invalidWordCache.add(lw);
+				try {
+					FileOutputStream fileOut = new FileOutputStream(DATABASE_INVALID);
+					ObjectOutputStream objectOut = new ObjectOutputStream(fileOut);
+					objectOut.writeObject(invalidWordCache);
+					objectOut.close(); 
+				} catch (Exception ex) {
+					ex.printStackTrace();
+				}
 			}
 		}
 		return res;
@@ -236,7 +240,7 @@ public class Dictionnary {
 			throw new Error();
 		}
 	}
-	
+
 	private static Object getFromFile(String s)
 	{
 		try {
@@ -254,9 +258,9 @@ public class Dictionnary {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		
+
 		throw new Error();
-		
+
 	}
 
 	public static boolean isInWordReferenceDictionnary(LanguageWord lw) {

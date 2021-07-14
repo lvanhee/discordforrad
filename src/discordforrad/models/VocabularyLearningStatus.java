@@ -43,15 +43,12 @@ public class VocabularyLearningStatus {
 			Map<LanguageWord, Integer> m, 
 			Map<LanguageWord, LocalDateTime> m2)
 	{
-		Set<LanguageWord>toRemove = new HashSet<>();
-		for(LanguageWord lw:m.keySet())
-			if(!Dictionnary.isInDictionnaries(lw))
-			{
-				System.out.println("REMOVING:"+lw);
-				toRemove.add(lw);
-			}
+		Set<LanguageWord>toRemove =
+				m.keySet().stream().sorted((x,y)->x.toString().compareTo(y.toString()))
+				.filter(lw->!Dictionnary.isInDictionnaries(lw)).collect(Collectors.toSet());
 		
-		for(LanguageWord lw:toRemove)m.remove(lw);
+		for(LanguageWord lw:toRemove)
+			m.remove(lw);
 		this.successfulLearningPerWord = m;
 		this.timeLastAttempt = m2;
 	}

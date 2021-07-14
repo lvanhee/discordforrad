@@ -88,21 +88,25 @@ public class WebScrapping {
 		String header = "https://";
 		
 		String pageToAskFor = header + getWordReferenceWebPageName(lw)+lw.getWord();
-		
-		if(getCacheFileNameFor(pageToAskFor, lw).exists())
-			if(getCacheFileNameFor(pageToAskFor,lw).exists())
-				try {
-					// default StandardCharsets.UTF_8
-					String content = Files.readString(getCacheFileNameFor(pageToAskFor,lw).toPath(), StandardCharsets.ISO_8859_1);
-					return content;
 
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
+
+		if(getCacheFileNameFor(pageToAskFor,lw).exists())
+			try {
+				// default StandardCharsets.UTF_8
+				String content = Files.readString(
+						getCacheFileNameFor(pageToAskFor,lw).toPath(),
+						StandardCharsets.ISO_8859_1);
+				return content;
+
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
 
 		//String res = RobotManager.getFullPageAsHtml(pageToAskFor);
-		String res = WebpageReader.downloadWebPage(pageToAskFor,lw.toString());
+		String res =// WebpageReader.traditionalWebPageContents(pageToAskFor);
+				WebpageReader.downloadWebPage(pageToAskFor,lw.toString());
 		
+	//	System.out.println(res);
 		saveOnCache(pageToAskFor,lw, res);
 		return res;
 	}
@@ -112,7 +116,7 @@ public class WebScrapping {
 		BufferedWriter writer;
 		try {
 			cacheFileName.createNewFile();
-			writer = new BufferedWriter(new FileWriter(cacheFileName));
+			writer = new BufferedWriter(new FileWriter(cacheFileName,StandardCharsets.ISO_8859_1));
 
 			writer.write(res);
 

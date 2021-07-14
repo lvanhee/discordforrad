@@ -61,6 +61,8 @@ public class EntryDrivenSMLLearningSession {
 				longList.add(lw);
 			else throw new Error();
 		
+		if(allWords.stream().anyMatch(x->!Dictionnary.isInDictionnaries(x)))throw new Error();
+		
 		shortList = new ArrayList<>(new LinkedHashSet<>(shortList));
 		midList = new ArrayList<>(new LinkedHashSet<>(midList));
 		longList = new ArrayList<>(new LinkedHashSet<>(longList));
@@ -82,6 +84,14 @@ public class EntryDrivenSMLLearningSession {
 		nbMidToExplore = midTermWordsToTeachInThisSession.size();
 		nbLongToExplore = longTermWordsToTeachInThisSession.size();
 		
+		for(LanguageWord lw:shortTermWordsToTeachInThisSession)
+			System.out.println(lw+" "+Dictionnary.isInDictionnaries(lw));
+		
+		for(LanguageWord lw:midTermWordsToTeachInThisSession)
+			System.out.println(lw+" "+Dictionnary.isInDictionnaries(lw));
+		
+		for(LanguageWord lw:longTermWordsToTeachInThisSession)
+			System.out.println(lw+" "+Dictionnary.isInDictionnaries(lw));
 		/*FORMER PROCEDURE FOR THE FULL RANDOM LEARNING
 		 * 
 		 * shortTermWordsToTeachInThisSession.clear();

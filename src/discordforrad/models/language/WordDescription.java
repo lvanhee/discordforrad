@@ -16,7 +16,8 @@ import net.dv8tion.jda.api.entities.TextChannel;
 
 public class WordDescription {
 	public static enum WordType{UNDEFINED, ADV, VTR, N, S,UTTR, PREP, ADJ, V_EXPR,VI,VITR, VITR_PART, RAKN, PRON,
-		N_PL,EXPR, INTERJ, CONJ;
+		N_PL,EXPR, INTERJ, CONJ, VBAL_UTTR, VTR_PHRASAL_SEP, VTR_PHRASAL_INSEP, VTR_PARTIKEL_OSKJ, V_PRES,
+		PREFIX, EGEN_NAMN, SPL, N_AS_ADJ, V_AUX, HJV;
 
 		public static WordType parse(String type) {
 			if(type.equals("adv"))return ADV;
@@ -36,8 +37,20 @@ public class WordDescription {
 			if(type.equals("expr"))return EXPR;
 			if(type.equals("interj"))return INTERJ;
 			if(type.equals("konj"))return CONJ;
+			if(type.equals("conj"))return CONJ;
+			if(type.equals("vbal uttr"))return VBAL_UTTR;
+			if(type.equals("vtr phrasal sep"))return VTR_PHRASAL_SEP;
+			if(type.equals("vtr phrasal insep"))return VTR_PHRASAL_INSEP;
+			if(type.equals("vtr partikel oskj"))return VTR_PARTIKEL_OSKJ;
+			if(type.equals("v pres"))return V_PRES;
+			if(type.equals("prefix"))return PREFIX;
+			if(type.equals("egen"))return EGEN_NAMN;
+			if(type.equals("spl"))return SPL;
+			if(type.equals("n as adj"))return N_AS_ADJ;
+			if(type.equals("v aux"))return V_AUX;
+			if(type.equals("hjv"))return HJV;
 			
-			throw new Error();
+			throw new Error(type+" undefined");
 		}};
 
 		private List<TranslationDescription> translations;
@@ -51,6 +64,8 @@ public class WordDescription {
 		}
 
 		public static WordDescription getDescriptionFor(LanguageWord lw) {
+			if(!Dictionnary.isInDictionnaries(lw))
+				throw new Error(lw+" not in dictionnaries");
 			String babLaInput = WebScrapping.getContentsFromBabLa(lw);
 			LanguageCode translateTo = LanguageCode.otherLanguage(lw.getCode());
 
@@ -85,12 +100,12 @@ public class WordDescription {
 				contextSentences.addAll(getBabLaContextSentencesFrom(lw, babLaInput));
 			}
 
-			if(Dictionnary.isInWordReferenceDictionnary(lw))
-			{
+			//if(Dictionnary.isInWordReferenceDictionnary(lw))
+		//	{
 				String wrInput = WebScrapping.getContentsFromReferenceWord(lw);
 
 				translations.addAll(getWordReferenceDefinitionsFrom(lw,wrInput));
-			}
+			//}
 
 
 			return new WordDescription(lw,translations, contextSentences);
@@ -101,50 +116,150 @@ public class WordDescription {
 				String wrInput) {
 
 			List<TranslationDescription>res = new ArrayList<>();
-			if(!wrInput.contains("Huvudsakliga översättningar"))return res;
-			String startOfSearch = wrInput.substring(wrInput.indexOf("Huvudsakliga översättningar"));
-
-			String boundedSearchForFirstTranslation = startOfSearch.substring(0,startOfSearch.indexOf("</table>")); 
-
-			LanguageCode left = null;
-			if(!boundedSearchForFirstTranslation.contains("Svenska")) throw new Error();
-			if(!boundedSearchForFirstTranslation.contains("Engelska")) throw new Error();
-			if(boundedSearchForFirstTranslation.indexOf("Svenska")<boundedSearchForFirstTranslation.indexOf("Engelska"))
-				left = LanguageCode.SV;
-			else left = LanguageCode.EN;
-			LanguageCode right = LanguageCode.otherLanguage(left);
-
-
-
-			boundedSearchForFirstTranslation = boundedSearchForFirstTranslation.substring(boundedSearchForFirstTranslation.indexOf("\n"));
-
+	//		System.out.println(wrInput);
+			if(!wrInput.contains("Huvudsakliga översättningar"))
+				return res;
+			
+			int indexDef = wrInput.indexOf("Huvudsakliga översättningar");
+			
+			int startTable = wrInput.substring(0,indexDef)
+					.lastIndexOf("<table");
+			
+					
+			String startOfSearched = wrInput.substring(startTable);
+			int endTable = startOfSearched.indexOf("</table>");
+			String searchedString = startOfSearched.substring(0,endTable);
+			
+			String[] splittedTable = searchedString.split("<tr");
+			
+			
+		/*	String headOfTable = searchedString.substring(searchedString.indexOf("<tr")+4);
+			headOfTable = headOfTable.substring(0,headOfTable.indexOf(ch))*/
+			String languageRow = splittedTable[2];
+			LanguageCode languageCodeLeftTable = null;
+			if(!languageRow.contains("Svenska")) throw new Error();
+			if(!languageRow.contains("Engelska")) throw new Error();
+			if(languageRow.indexOf("Svenska")<languageRow.indexOf("Engelska"))
+				languageCodeLeftTable = LanguageCode.SV;
+			else languageCodeLeftTable = LanguageCode.EN;
+			LanguageCode languageCodeRightTable = LanguageCode.otherLanguage(languageCodeLeftTable);
+			
+			
 			String lastLeftTranslation = null;
 			String lastLeftComplementaryTranslation = "";
 			String lastRightComplementaryTranslation = "";
 			WordType currentTypeLeft = null;
 
-			for(String line : boundedSearchForFirstTranslation.split("\n"))
+			for(String line : 
+				Arrays.asList(splittedTable).subList(3, splittedTable.length))
 			{
 				if(line.isBlank())continue;
-
-				String separator = null;
-				if(line.contains("&nbsp;"))
-					separator = "&nbsp";
-				else separator = "<td class='ToWrd' >";
-
-				String leftSideOfTheRow = line.substring(0, line.indexOf(separator)+separator.length());
-
-				String rightSideOfTheRow = line.substring(line.indexOf(separator));
-				if(leftSideOfTheRow.contains("<strong>"))
+				String[] subsplit = line.split("<td");
+				for(String split:subsplit)
 				{
-					lastLeftTranslation = line.substring(leftSideOfTheRow.indexOf("<strong>")+8,
-							leftSideOfTheRow.indexOf("</strong>"))
-							.replaceAll("<span title='something'>", "")
-							.replaceAll("</span>", "")
-							.replaceAll("<br>", "")
-							.replaceAll("!", "");
+					if(split.replaceAll(" ", "").startsWith("class=\"even\"")) continue;
+					if(split.replaceAll(" ", "").startsWith("class=\"FrWrd\""))
+					{
+						lastLeftTranslation = split.substring(split.indexOf("<strong>")+8,
+								split.indexOf("</strong>"))
+								.replaceAll("</span>", "")
+								.replaceAll("<br>", "")
+								.replaceAll("<br/>", "")
+								.replaceAll("!", "")
+								.replaceAll("\n", "")
+								.replaceAll("\r", "");
+						lastLeftTranslation = lastLeftTranslation.trim();
+						while(lastLeftTranslation.contains("  "))
+							lastLeftTranslation=lastLeftTranslation.replaceAll("  ", " ");
+						
+						currentTypeLeft = getWordTypeOf(split);
+						/*while(lastLeftTranslation.contains("<span"))
+						{
+							int start = lastLeftTranslation.indexOf("<span");
+							int end = lastLeftTranslation.indexOf(">");
+							lastLeftTranslation = lastLeftTranslation.substring(0,start) +
+									lastLeftTranslation.substring(end+1);
+						}*/
+					}
+					if(split.startsWith(">"))
+					{
+						lastLeftComplementaryTranslation =
+								split.replaceAll("</td>", "")
+								.replaceAll("<span class=\"dsense\">","")
+								.replaceAll("<i>", "")
+								.replaceAll("</i>", "")
+								.replaceAll("</span>", "")
+								.replaceAll("<i class=\"Fr2\">", "")
+								.replaceAll("\n", "")
+								.replaceAll("<br/", "")
+								.replaceAll("\r", "")
+								.replaceAll("<span title=\"something\"", "")
+								.replaceAll(">", "").trim();
+						while(lastLeftComplementaryTranslation.contains("  "))
+							lastLeftComplementaryTranslation = lastLeftComplementaryTranslation.replaceAll("  ", "");
+						
+						
+					}
+					if(split.startsWith(" class=\"ToWrd\">"))
+					{
+						Set<String> rightTranslations = new HashSet<>();
+						WordType currentTypeRight = WordType.UNDEFINED;
+						
+						String wordsOnRightSide = split.replaceAll(" class='ToWrd' >", "")
+								.replaceAll(" class=\"ToWrd\">","")
+								.replaceAll(" class='POS2'>", "")
+								.replaceAll("</em>", "")
+								.replaceAll("</td>", "")
+								.replaceAll("</tr>", "")
+								.replaceAll("<i>", "")
+								.replaceAll("</i>", "")
+								.replaceAll("</tr>", "")
+								.replaceAll("&nbsp;", "")
+								.replaceAll("<td>", "")
+								;
+						
+						if(wordsOnRightSide.contains("<a")) 
+							wordsOnRightSide = wordsOnRightSide.substring(0,wordsOnRightSide.indexOf("<a"));
+						if(wordsOnRightSide.contains("<em")) 
+							wordsOnRightSide = wordsOnRightSide.substring(0,wordsOnRightSide.indexOf("<em"));
+						if(wordsOnRightSide.contains("</span>"))wordsOnRightSide = 
+								wordsOnRightSide.substring(wordsOnRightSide.indexOf("</span>")+7);
+						wordsOnRightSide = wordsOnRightSide.trim();
+						rightTranslations.addAll(Arrays.asList(wordsOnRightSide.split(",")).stream()
+								.map(x->x.replaceAll(",", "").trim()).collect(Collectors.toSet()));
+						
+						currentTypeRight = getWordTypeOf(split);
+						
 
-					if(leftSideOfTheRow.contains("<td>"))
+						for(String rightTranslation:rightTranslations)
+							if(lw.equals(LanguageWord.newInstance(lastLeftTranslation, languageCodeLeftTable)))
+							{
+								res.add(TranslationDescription.newInstance(
+										LanguageText.newInstance(languageCodeRightTable, rightTranslation),
+										lastLeftComplementaryTranslation+" "+lastRightComplementaryTranslation,
+										currentTypeRight,
+										TranslationDescription.Origin.WORD_REFERENCE));
+							}
+
+						for(String localTranslation:rightTranslations)
+						{
+							localTranslation = localTranslation.trim();
+							if(lw.equals(LanguageWord.newInstance(localTranslation, languageCodeRightTable)))
+							{
+								res.add(TranslationDescription.newInstance(LanguageText.newInstance(languageCodeLeftTable,lastLeftTranslation), 
+										lastLeftComplementaryTranslation+lastRightComplementaryTranslation,
+										currentTypeLeft, TranslationDescription.Origin.WORD_REFERENCE));
+							}
+						}
+					}
+					
+				}
+				
+				
+				
+					
+
+				/*	if(leftSideOfTheRow.contains("<td>"))
 					{
 						lastLeftComplementaryTranslation = leftSideOfTheRow.substring(leftSideOfTheRow.lastIndexOf("<td>")+4);
 						if(lastLeftComplementaryTranslation.contains("</td>"))
@@ -169,9 +284,9 @@ public class WordDescription {
 								leftSideOfTheRow.indexOf("<span>"));
 						currentTypeLeft = WordType.parse(type);
 					}
-				}
+				}*/
 
-				if(rightSideOfTheRow.replaceAll(" ", "").contains("<spanclass='dsense'>"))
+			/*	if(rightSideOfTheRow.replaceAll(" ", "").contains("<spanclass='dsense'>"))
 				{
 					lastRightComplementaryTranslation = 
 							rightSideOfTheRow.substring(rightSideOfTheRow.indexOf("<i>")-1,
@@ -182,63 +297,7 @@ public class WordDescription {
 				}else 
 					lastRightComplementaryTranslation = "";
 
-				Set<String> rightTranslations = new HashSet<>();
-				WordType currentTypeRight = WordType.UNDEFINED;
-				
-				String wordsOnRightSide = rightSideOfTheRow.replaceAll("<td class='ToWrd' >", "")
-						.replaceAll("<em class='POS2'>", "")
-						.replaceAll("</em>", "")
-						.replaceAll("</td>", "")
-						.replaceAll("</tr>", "")
-						.replaceAll("<i>", "")
-						.replaceAll("</i>", "")
-						.replaceAll("</tr>", "")
-						.replaceAll("&nbsp;", "")
-						.replaceAll("<td>", "");
-				
-				if(wordsOnRightSide.contains("<a")) 
-					wordsOnRightSide = wordsOnRightSide.substring(0,wordsOnRightSide.indexOf("<a"));
-				if(wordsOnRightSide.contains("<em")) 
-					wordsOnRightSide = wordsOnRightSide.substring(0,wordsOnRightSide.indexOf("<em"));
-				if(wordsOnRightSide.contains("</span>"))wordsOnRightSide = 
-						wordsOnRightSide.substring(wordsOnRightSide.indexOf("</span>")+7);
-				
-				rightTranslations.addAll(Arrays.asList(wordsOnRightSide.split(",")).stream()
-						.map(x->{
-							while(x.startsWith(" "))x=x.substring(1);
-							
-							while(x.endsWith(" "))x = x.substring(0,x.length()-1);
-							
-							return x;
-						}).collect(Collectors.toSet()));
-				
-				if(rightSideOfTheRow.contains("<em class='tooltip POS2'>"))
-				{
-					String type = rightSideOfTheRow.substring(rightSideOfTheRow.indexOf("<em class='tooltip POS2'>")+25,
-							rightSideOfTheRow.indexOf("<span>"));
-					currentTypeRight = WordType.parse(type);
-				}
-
-				for(String rightTranslation:rightTranslations)
-					if(lw.equals(LanguageWord.newInstance(lastLeftTranslation, left)))
-					{
-						res.add(TranslationDescription.newInstance(
-								LanguageText.newInstance(right, rightTranslation),
-								lastLeftComplementaryTranslation+" "+lastRightComplementaryTranslation,
-								currentTypeRight,
-								TranslationDescription.Origin.WORD_REFERENCE));
-					}
-
-				for(String localTranslation:rightTranslations)
-				{
-					while (localTranslation.startsWith(" ")) localTranslation = localTranslation.substring(1);
-					if(lw.equals(LanguageWord.newInstance(localTranslation, right)))
-					{
-						res.add(TranslationDescription.newInstance(LanguageText.newInstance(left,lastLeftTranslation), 
-								lastLeftComplementaryTranslation+lastRightComplementaryTranslation,
-								currentTypeLeft, TranslationDescription.Origin.WORD_REFERENCE));
-					}
-				}
+				*/
 			}
 
 			if(wrInput.contains("Matchande uppslagsord från andra sidan av ordboken."))
@@ -248,6 +307,16 @@ public class WordDescription {
 				res.addAll(otherTranslation);
 			}
 			return res;
+		}
+
+		private static WordType getWordTypeOf(String split) {
+			if(split.contains("<em class=\"tooltip POS2\">"))
+			{
+				String type = split.substring(split.indexOf("<em class=\"tooltip POS2\">")+25,
+						split.indexOf("<span>")).trim();
+				return WordType.parse(type);
+			}
+			return WordType.UNDEFINED;
 		}
 
 		private static List<String> getBabLaDefinitionsFrom(LanguageWord lw, String babLaInput) {
