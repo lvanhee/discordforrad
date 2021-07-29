@@ -239,6 +239,16 @@ public class OrdforrAIListener extends ListenerAdapter {
 		String toPrint = "";//description.toString();
 		String translationText = "";
 		
+		String wordTypesToPrint = "";
+		
+		for(WordType wt:description.getWordTypes())
+		{
+			wordTypesToPrint+=wt+" "+description.getAlternativesFor(wt)+"\n";
+		}
+		
+		toPrint += wordTypesToPrint+"\n";
+		
+		
 		List<TranslationDescription> translations = description.getTranslations();
 		
 		Map<LanguageText, Set<TranslationDescription.Origin>> countPerTranslation = new HashMap<>();

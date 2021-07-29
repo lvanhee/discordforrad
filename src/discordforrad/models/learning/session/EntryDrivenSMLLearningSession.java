@@ -49,32 +49,23 @@ public class EntryDrivenSMLLearningSession {
 		List<LanguageWord> allWords = currentFocus.getAllValidSortedWords();
 		
 		List<LanguageWord> shortList = new ArrayList<>();
-		List<LanguageWord> midList = new ArrayList<>();
-		List<LanguageWord> longList = new ArrayList<>();
-
+		
 		for(LanguageWord lw:allWords.stream().filter(x->vls.isReadyToBeExposedAgain(x)).collect(Collectors.toList()))
 			if(vls.isShortTermWord(lw))
 				shortList.add(lw);
-			else if(vls.isMidTermWord(lw))
-				midList.add(lw);
-			else if(vls.isLongTermWord(lw))
-				longList.add(lw);
-			else throw new Error();
 		
 		if(allWords.stream().anyMatch(x->!Dictionnary.isInDictionnaries(x)))throw new Error();
 		
 		shortList = new ArrayList<>(new LinkedHashSet<>(shortList));
-		midList = new ArrayList<>(new LinkedHashSet<>(midList));
-		longList = new ArrayList<>(new LinkedHashSet<>(longList));
+		midTermWordsToTeachInThisSession = vls.getStandardSessionMidTermWordsToLearn();
+		longTermWordsToTeachInThisSession = vls.getStandardSessionLongTermWordsToLearn().subList(0, 10);
 		
-		Collections.shuffle(longList);
-		Collections.shuffle(midList);
+		Collections.shuffle(midTermWordsToTeachInThisSession);
+		Collections.shuffle(longTermWordsToTeachInThisSession);
 		
 		
 
 		shortTermWordsToTeachInThisSession = shortList.subList(0, Math.min(20, shortList.size()));
-		midTermWordsToTeachInThisSession = vls.getStandardSessionMidTermWordsToLearn();
-		longTermWordsToTeachInThisSession = vls.getStandardSessionLongTermWordsToLearn().subList(0, 10);
 		
 		isFocusFullyCompleted = shortTermWordsToTeachInThisSession.isEmpty() &&
 				midTermWordsToTeachInThisSession.isEmpty() &&
@@ -84,58 +75,6 @@ public class EntryDrivenSMLLearningSession {
 		nbMidToExplore = midTermWordsToTeachInThisSession.size();
 		nbLongToExplore = longTermWordsToTeachInThisSession.size();
 		
-		for(LanguageWord lw:shortTermWordsToTeachInThisSession)
-			System.out.println(lw+" "+Dictionnary.isInDictionnaries(lw));
-		
-		for(LanguageWord lw:midTermWordsToTeachInThisSession)
-			System.out.println(lw+" "+Dictionnary.isInDictionnaries(lw));
-		
-		for(LanguageWord lw:longTermWordsToTeachInThisSession)
-			System.out.println(lw+" "+Dictionnary.isInDictionnaries(lw));
-		/*FORMER PROCEDURE FOR THE FULL RANDOM LEARNING
-		 * 
-		 * shortTermWordsToTeachInThisSession.clear();
-		List<LanguageWord> allShortTermWordsReadyToBeAsked = vls.getAllShortTermWords().stream().filter(x->LearningModel.isTimeForLearning(x, vls)).collect(Collectors.toList());
-		List<LanguageWord> allMidTermWordsReadyToBeAsked = vls.getAllMidTermWords().stream().filter(x->LearningModel.isTimeForLearning(x, vls)).collect(Collectors.toList());
-		List<LanguageWord> allLongTermWordsReadyToBeAsked = vls.getAllLongTermWords().stream().filter(x->LearningModel.isTimeForLearning(x, vls)).collect(Collectors.toList());
-		Random r = new Random();
-		List<LanguageWord> allShortTermWordsPreviouslyFailed = vls.getAllShortTermWords().stream()
-				.filter(x->vls.getLastSuccessOf(x).isAfter(LocalDateTime.MIN))
-				.filter(x->LearningModel.isTimeForLearning(x, vls)).collect(Collectors.toList());
-
-		for(int i = 0 ; i < 10 ; i++)
-		{
-			if(allShortTermWordsPreviouslyFailed.isEmpty())break;
-			int index = r.nextInt(allShortTermWordsPreviouslyFailed.size());
-			shortTermWordsToTeachInThisSession.add(allShortTermWordsPreviouslyFailed.get(index));
-			allShortTermWordsPreviouslyFailed.remove(index);
-		}
-
-		while(shortTermWordsToTeachInThisSession.size() < 10)
-		{
-			if(allShortTermWordsReadyToBeAsked.isEmpty())break;
-			int index = r.nextInt(allShortTermWordsReadyToBeAsked.size());
-			shortTermWordsToTeachInThisSession.add(allShortTermWordsReadyToBeAsked.get(index));
-			allShortTermWordsReadyToBeAsked.remove(index);
-		}
-		allMidTermWordsReadyToBeAsked.removeAll(shortTermWordsToTeachInThisSession);
-		midTermWordsToTeachInThisSession.clear();
-		for(int i = 0 ; i < 10 ; i++)
-		{
-			if(allMidTermWordsReadyToBeAsked.isEmpty())break;
-			int index = r.nextInt(allMidTermWordsReadyToBeAsked.size());
-			midTermWordsToTeachInThisSession.add(allMidTermWordsReadyToBeAsked.get(index));
-			allMidTermWordsReadyToBeAsked.remove(index);
-		}
-
-		longTermWordsToTeachInThisSession.clear();
-		for(int i = 0 ; i < 10 ; i++)
-		{
-			if(allLongTermWordsReadyToBeAsked.isEmpty())break;
-			int index = r.nextInt(allLongTermWordsReadyToBeAsked.size());
-			midTermWordsToTeachInThisSession.add(allLongTermWordsReadyToBeAsked.get(index));
-			allLongTermWordsReadyToBeAsked.remove(index);
-		}*/
 	}
 
 	public static EntryDrivenSMLLearningSession default3x3LearningSession(ReadThroughFocus currentFocus, 

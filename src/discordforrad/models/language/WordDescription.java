@@ -3,45 +3,55 @@ package discordforrad.models.language;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 import discordforrad.LanguageCode;
 import discordforrad.Translator;
 import discordforrad.inputUtils.WebScrapping;
+import discordforrad.inputUtils.WebScrapping.DataBaseEnum;
 import discordforrad.models.language.TranslationDescription.Origin;
+import discordforrad.models.language.WordDescription.WordType;
 import net.dv8tion.jda.api.entities.TextChannel;
 
 public class WordDescription {
 	public static enum WordType{UNDEFINED, ADV, VTR, N, S,UTTR, PREP, ADJ, V_EXPR,VI,VITR, VITR_PART, RAKN, PRON,
 		N_PL,EXPR, INTERJ, CONJ, VBAL_UTTR, VTR_PHRASAL_SEP, VTR_PHRASAL_INSEP, VTR_PARTIKEL_OSKJ, V_PRES,
-		PREFIX, EGEN_NAMN, SPL, N_AS_ADJ, V_AUX, HJV;
+		PREFIX, EGEN_NAMN, SPL, N_AS_ADJ, V_AUX, HJV, V, VTR_PARTIKEL_SKJ,
+		ADJECTIVE_ENDING,
+		VI_PHRASAL;
 
 		public static WordType parse(String type) {
-			if(type.equals("adv"))return ADV;
+			if(type.equals("adv")||type.startsWith("adverb"))return ADV;
 			if(type.equals("vtr"))return VTR;
-			if(type.equals("n"))return N;
+			if(type.equals("n")||type.equals("substantiv")||type.equals("oböjligt substantiv"))return N;
 			if(type.equals("s"))return S;
 			if(type.equals("uttr"))return UTTR;
-			if(type.equals("prep"))return PREP;
-			if(type.equals("adj"))return ADJ;
+			if(type.equals("prep")||type.equals("preposition")
+					||type.equals("preposition och adverb"))return PREP;
+			if(type.equals("adj")||type.equals("adjektiv")
+					||type.equals("oböjligt adjektiv"))return ADJ;
+			if(type.equals("adjektiviskt slutled")) return N;
 			if(type.equals("v expr"))return V_EXPR;
 			if(type.equals("vi"))return VI;
 			if(type.equals("vitr"))return VITR;
 			if(type.equals("vitr partikel"))return VITR_PART;
-			if(type.equals("räkn"))return RAKN;
-			if(type.equals("pron"))return PRON;
+			if(type.equals("räkn")||type.equals("räkneord"))return RAKN;
+			if(type.equals("pron")||type.equals("pronomen"))return PRON;
 			if(type.equals("npl"))return N_PL;
 			if(type.equals("expr"))return EXPR;
 			if(type.equals("interj"))return INTERJ;
-			if(type.equals("konj"))return CONJ;
+			if(type.equals("konj") || type.equals("subjunktion"))return CONJ;
 			if(type.equals("conj"))return CONJ;
 			if(type.equals("vbal uttr"))return VBAL_UTTR;
 			if(type.equals("vtr phrasal sep"))return VTR_PHRASAL_SEP;
 			if(type.equals("vtr phrasal insep"))return VTR_PHRASAL_INSEP;
 			if(type.equals("vtr partikel oskj"))return VTR_PARTIKEL_OSKJ;
+			if(type.equals("vtr partikel skj"))return VTR_PARTIKEL_SKJ;
 			if(type.equals("v pres"))return V_PRES;
 			if(type.equals("prefix"))return PREFIX;
 			if(type.equals("egen"))return EGEN_NAMN;
@@ -49,24 +59,60 @@ public class WordDescription {
 			if(type.equals("n as adj"))return N_AS_ADJ;
 			if(type.equals("v aux"))return V_AUX;
 			if(type.equals("hjv"))return HJV;
-			
+			if(type.equals("verb"))return V;
+			if(type.equals("vi phrasal"))return VI_PHRASAL;
+			if(type.equals("interjektion"))return INTERJ;
 			throw new Error(type+" undefined");
+		}
+
+		public static boolean hasAlternativeForms(WordType wt) {
+			switch(wt)
+			{
+			case ADV:return false;
+			case ADJ:return true;
+			default: throw new Error();
+			}
+		}
+
+		public static WordType parseRaw(String s, DataBaseEnum saol) {
+			if(saol.equals(DataBaseEnum.SAOL))
+			{
+				final String wordClassIndicator = "<a class=\"ordklass\">";
+				String wordClassStart = s.substring(s.indexOf(wordClassIndicator)+wordClassIndicator.length());
+				String wordClass = wordClassStart.substring(0, wordClassStart.indexOf("</a>")).trim();
+				return parse(wordClass);
+			}
+			if(saol.equals(DataBaseEnum.SO))
+			{
+				final String wordClassIndicator = "<div class=\"ordklass\">";
+				String wordClassStart = s.substring(s.indexOf(wordClassIndicator)+wordClassIndicator.length());
+				String wordClass = wordClassStart.substring(0, wordClassStart.indexOf("</div>")).trim();
+				return parse(wordClass);
+			}
+			throw new Error();
 		}};
 
 		private List<TranslationDescription> translations;
 		private Set<StringPair> contextSentences;
 		private final LanguageWord lw;
+		private Map<WordType, RelatedForms> alternativeForms;
 
-		public WordDescription(LanguageWord lw, List<TranslationDescription> translations2, Set<StringPair> contextSentences2) {
+		public WordDescription(LanguageWord lw, List<TranslationDescription> translations2, 
+				Set<StringPair> contextSentences2, 
+				Map<WordType, RelatedForms> af
+				) {
 			this.lw = lw;
 			this.translations = translations2;
 			this.contextSentences = contextSentences2;
+			this.alternativeForms = af;
 		}
 
 		public static WordDescription getDescriptionFor(LanguageWord lw) {
 			if(!Dictionnary.isInDictionnaries(lw))
 				throw new Error(lw+" not in dictionnaries");
-			String babLaInput = WebScrapping.getContentsFromBabLa(lw);
+
+			Map<WordType, RelatedForms>af = new HashMap<>();
+			String babLaInput = WebScrapping.getContentsFrom(lw, DataBaseEnum.BAB_LA);
 			LanguageCode translateTo = LanguageCode.otherLanguage(lw.getCode());
 
 			//	System.out.println(babLaInput);
@@ -100,15 +146,56 @@ public class WordDescription {
 				contextSentences.addAll(getBabLaContextSentencesFrom(lw, babLaInput));
 			}
 
-			//if(Dictionnary.isInWordReferenceDictionnary(lw))
-		//	{
-				String wrInput = WebScrapping.getContentsFromReferenceWord(lw);
+			if(Dictionnary.isInDictionnaryOf(lw, DataBaseEnum.SO))
+			{
+				List<String> allFormsFromSO = 
+						Arrays.asList(WebScrapping.getContentsFrom(lw, DataBaseEnum.SO).split("<div class=\"superlemma\""))
+						.stream().collect(Collectors.toList());
+				allFormsFromSO.remove(0);
 
-				translations.addAll(getWordReferenceDefinitionsFrom(lw,wrInput));
+				for(String wholeForm:allFormsFromSO)
+				{
+					final String wordClassIndicator = "<div class=\"ordklass\">";
+					String wordClassStart = wholeForm.substring(wholeForm.indexOf(wordClassIndicator)+wordClassIndicator.length());
+					String wordClass = wordClassStart.substring(0, wordClassStart.indexOf("</div>")).trim();
+					WordType wt = WordType.parse(wordClass);
+
+					RelatedForms rf = RelatedForms.parseFrom(wholeForm,DataBaseEnum.SO);
+
+					if(af.containsKey(wt)&&!af.get(wt).equals(rf)) 
+						af.put(wt, af.get(wt).blendWith(rf));
+					else af.put(wt,rf);
+
+				}
+			}
+			
+			if(Dictionnary.isInDictionnaryOf(lw, DataBaseEnum.SAOL))
+			{
+				List<String> allForms = 
+						Arrays.asList(WebScrapping.getContentsFrom(lw, DataBaseEnum.SAOL).split("<a class=\"ordklass\">"))
+						.stream().collect(Collectors.toList());
+				allForms.remove(0);
+
+				for(String wholeForm:allForms)
+				{
+					final String grund = wholeForm.substring(0,wholeForm.indexOf("</span>")).trim();
+					WordType wt = WordType.parseRaw(wholeForm, DataBaseEnum.SAOL);
+
+					RelatedForms rf = RelatedForms.parseFrom(wholeForm,DataBaseEnum.SAOL);
+					if(!rf.containsForm(lw))continue;
+
+					if(af.containsKey(wt)&&!af.get(wt).equals(rf)) 
+						af.put(wt, af.get(wt).blendWith(rf));
+					else af.put(wt,rf);
+
+				}
+			}
+
+			translations.addAll(getWordReferenceDefinitionsFrom(lw,WebScrapping.getContentsFrom(lw, DataBaseEnum.WORD_REFERENCE)));
 			//}
 
 
-			return new WordDescription(lw,translations, contextSentences);
+			return new WordDescription(lw,translations, contextSentences, af);
 
 		}
 
@@ -116,24 +203,26 @@ public class WordDescription {
 				String wrInput) {
 
 			List<TranslationDescription>res = new ArrayList<>();
-	//		System.out.println(wrInput);
+			if(wrInput==null)
+				throw new Error();
+			
 			if(!wrInput.contains("Huvudsakliga översättningar"))
 				return res;
-			
+
 			int indexDef = wrInput.indexOf("Huvudsakliga översättningar");
-			
+
 			int startTable = wrInput.substring(0,indexDef)
 					.lastIndexOf("<table");
-			
-					
+
+
 			String startOfSearched = wrInput.substring(startTable);
 			int endTable = startOfSearched.indexOf("</table>");
 			String searchedString = startOfSearched.substring(0,endTable);
-			
+
 			String[] splittedTable = searchedString.split("<tr");
-			
-			
-		/*	String headOfTable = searchedString.substring(searchedString.indexOf("<tr")+4);
+
+
+			/*	String headOfTable = searchedString.substring(searchedString.indexOf("<tr")+4);
 			headOfTable = headOfTable.substring(0,headOfTable.indexOf(ch))*/
 			String languageRow = splittedTable[2];
 			LanguageCode languageCodeLeftTable = null;
@@ -143,8 +232,8 @@ public class WordDescription {
 				languageCodeLeftTable = LanguageCode.SV;
 			else languageCodeLeftTable = LanguageCode.EN;
 			LanguageCode languageCodeRightTable = LanguageCode.otherLanguage(languageCodeLeftTable);
-			
-			
+
+
 			String lastLeftTranslation = null;
 			String lastLeftComplementaryTranslation = "";
 			String lastRightComplementaryTranslation = "";
@@ -171,7 +260,7 @@ public class WordDescription {
 						lastLeftTranslation = lastLeftTranslation.trim();
 						while(lastLeftTranslation.contains("  "))
 							lastLeftTranslation=lastLeftTranslation.replaceAll("  ", " ");
-						
+
 						currentTypeLeft = getWordTypeOf(split);
 						/*while(lastLeftTranslation.contains("<span"))
 						{
@@ -197,14 +286,14 @@ public class WordDescription {
 								.replaceAll(">", "").trim();
 						while(lastLeftComplementaryTranslation.contains("  "))
 							lastLeftComplementaryTranslation = lastLeftComplementaryTranslation.replaceAll("  ", "");
-						
-						
+
+
 					}
 					if(split.startsWith(" class=\"ToWrd\">"))
 					{
 						Set<String> rightTranslations = new HashSet<>();
 						WordType currentTypeRight = WordType.UNDEFINED;
-						
+
 						String wordsOnRightSide = split.replaceAll(" class='ToWrd' >", "")
 								.replaceAll(" class=\"ToWrd\">","")
 								.replaceAll(" class='POS2'>", "")
@@ -217,7 +306,7 @@ public class WordDescription {
 								.replaceAll("&nbsp;", "")
 								.replaceAll("<td>", "")
 								;
-						
+
 						if(wordsOnRightSide.contains("<a")) 
 							wordsOnRightSide = wordsOnRightSide.substring(0,wordsOnRightSide.indexOf("<a"));
 						if(wordsOnRightSide.contains("<em")) 
@@ -227,9 +316,9 @@ public class WordDescription {
 						wordsOnRightSide = wordsOnRightSide.trim();
 						rightTranslations.addAll(Arrays.asList(wordsOnRightSide.split(",")).stream()
 								.map(x->x.replaceAll(",", "").trim()).collect(Collectors.toSet()));
-						
+
 						currentTypeRight = getWordTypeOf(split);
-						
+
 
 						for(String rightTranslation:rightTranslations)
 							if(lw.equals(LanguageWord.newInstance(lastLeftTranslation, languageCodeLeftTable)))
@@ -252,12 +341,12 @@ public class WordDescription {
 							}
 						}
 					}
-					
+
 				}
-				
-				
-				
-					
+
+
+
+
 
 				/*	if(leftSideOfTheRow.contains("<td>"))
 					{
@@ -286,18 +375,18 @@ public class WordDescription {
 					}
 				}*/
 
-			/*	if(rightSideOfTheRow.replaceAll(" ", "").contains("<spanclass='dsense'>"))
+				/*	if(rightSideOfTheRow.replaceAll(" ", "").contains("<spanclass='dsense'>"))
 				{
 					lastRightComplementaryTranslation = 
 							rightSideOfTheRow.substring(rightSideOfTheRow.indexOf("<i>")-1,
 									rightSideOfTheRow.indexOf("</span>"))
 							.replaceAll("<i>", "")
-							
+
 							.replaceAll("</i>", "");
 				}else 
 					lastRightComplementaryTranslation = "";
 
-				*/
+				 */
 			}
 
 			if(wrInput.contains("Matchande uppslagsord från andra sidan av ordboken."))
@@ -417,6 +506,14 @@ public class WordDescription {
 
 		public LanguageWord getWord() {
 			return lw;
+		}
+
+		public Set<WordType> getWordTypes() {
+			return alternativeForms.keySet();
+		}
+
+		public RelatedForms getAlternativesFor(WordType wt) {
+			return alternativeForms.get(wt);
 		}
 
 }

@@ -19,6 +19,7 @@ import java.util.stream.Collectors;
 import discordforrad.LanguageCode;
 import discordforrad.inputUtils.TextInputUtils;
 import discordforrad.inputUtils.WebScrapping;
+import discordforrad.inputUtils.WebScrapping.DataBaseEnum;
 import webscrapping.WebpageReader;
 
 public class Dictionnary {
@@ -110,7 +111,7 @@ public class Dictionnary {
 				) return false;
 		isInBabLaDisctionnary(lw);
 
-		if(WebScrapping.isWordInReferenceWord(lw))
+		if(WebScrapping.isInDataBase(lw))
 			return true;
 		if(isInBabLaDisctionnary(lw))
 			return true;
@@ -137,7 +138,7 @@ public class Dictionnary {
 
 	public static boolean isInBabLaDisctionnary(LanguageWord lw) {
 
-		String webPageContents = WebScrapping.getContentsFromBabLa(lw);
+		String webPageContents = WebScrapping.getContentsFrom(lw, DataBaseEnum.BAB_LA);
 
 		String otherLanguageInPlainText = null;
 		if(lw.getCode().equals(LanguageCode.EN))
@@ -195,10 +196,13 @@ public class Dictionnary {
 			if(explored.contains(next)) continue;
 			explored.add(next);
 
+			
 
 			String loadingContents = 
-					WebScrapping.getContentsFromBabLa(next) + 
-					WebScrapping.getContentsFromReferenceWord(next);
+					Arrays.asList(DataBaseEnum.values())
+					.stream()
+					.map(x->WebScrapping.getContentsFrom(next, x))
+					.reduce("", (x,y)->x+" "+y);
 
 			MP3Loader.getFluxFromBabLa(next);
 
@@ -263,10 +267,9 @@ public class Dictionnary {
 
 	}
 
-	public static boolean isInWordReferenceDictionnary(LanguageWord lw) {
-		return WebScrapping.isWordInReferenceWord(lw);
+	public static boolean isInDictionnaryOf(LanguageWord lw, DataBaseEnum db) {
+		return WebScrapping.isInDataBase(lw, db);
 	}
-
 
 
 }
