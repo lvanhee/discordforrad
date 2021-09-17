@@ -1,5 +1,6 @@
 package discordforrad;
 
+import java.awt.AWTException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -10,6 +11,8 @@ import javax.security.auth.login.LoginException;
 import discordforrad.discordmanagement.OrdforrAIListener;
 import discordforrad.models.language.Dictionnary;
 import discordforrad.models.language.LanguageWord;
+import discordforrad.models.language.wordnetwork.WordNetwork;
+import discordforrad.models.language.wordnetwork.forms.RelatedFormsNetwork;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.OnlineStatus;
@@ -41,6 +44,17 @@ public class Main {
 
 	// Main method
 	public static void main(String[] args) throws LoginException, IOException, InterruptedException {
+		/*new Thread(()->{
+			try {
+				Dictionnary.main(args);
+			} catch (AWTException e) {
+				e.printStackTrace();
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}).start();*/
 		DisOrdforrAI.INSTANCE.startNewSession();
 
 		jda.addEventListener(new OrdforrAIListener());

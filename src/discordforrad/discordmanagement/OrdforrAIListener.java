@@ -38,6 +38,7 @@ import discordforrad.models.language.Dictionnary;
 import discordforrad.models.language.LanguageText;
 import discordforrad.models.language.LanguageWord;
 import discordforrad.models.language.StringPair;
+import discordforrad.models.language.SuccessfulTranslationDescription;
 import discordforrad.models.language.TranslationDescription;
 import discordforrad.models.language.WordDescription;
 import discordforrad.models.language.WordDescription.WordType;
@@ -64,39 +65,39 @@ public class OrdforrAIListener extends ListenerAdapter {
 
 		AudioPlayerManager playerManager = new DefaultAudioPlayerManager();
 		AudioSourceManagers.registerRemoteSources(playerManager);
-		
+
 		LocalSeekableInputStream localStream = new LocalSeekableInputStream(
 				new File("C:\\Users\\loisv\\Downloads\\binary.mp3"));
 		AudioTrack at = new Mp3AudioTrack(new AudioTrackInfo("", "", 1000, "", true, ""), localStream);
-	//	AudioLoadResultHandler load = new FunctionalResultHandler(trackConsumer, playlistConsumer, emptyResultHandler, exceptionConsumer)
-		
-	//	playerManager.loadItem(reference, resultHandler)
-	//	player = playerManager.createPlayer();
-		
-		
+		//	AudioLoadResultHandler load = new FunctionalResultHandler(trackConsumer, playlistConsumer, emptyResultHandler, exceptionConsumer)
+
+		//	playerManager.loadItem(reference, resultHandler)
+		//	player = playerManager.createPlayer();
+
+
 		AudioManager manager = Main.jda.getGuilds().get(0).getAudioManager();
 		// MySendHandler should be your AudioSendHandler implementation
 		//manager.setSendingHandler(new MySendHandler(player));
-	
+
 		//       player.playTrack(track);
 		// Here we finally connect to the target voice channel 
 		// and it will automatically start pulling the audio from the MySendHandler instance
 		manager.openAudioConnection(channel);
-		
-	//	player.playTrack(at);
-	//	player.startTrack(at, true);
-		
+
+		//	player.playTrack(at);
+		//	player.startTrack(at, true);
+
 		/*playerManager.loadItem("C:\\Users\\loisv\\Downloads\\binary.mp3", 
 				new FunctionalResultHandler(track -> player.playTrack(track),
                         null, null, null));*/
 
 		System.out.println("end");
-		
+
 		PlayerManager.getInstance()
-        .loadAndPlay(OrdforrAIListener.discussionChannel, 
-        		//"data/cache/mp3/ENaccommodation.mp3"
-        		"https://www.youtube.com/watch?v=JiF3pbvR5G0"
-        		);
+		.loadAndPlay(OrdforrAIListener.discussionChannel, 
+				//"data/cache/mp3/ENaccommodation.mp3"
+				"https://www.youtube.com/watch?v=JiF3pbvR5G0"
+				);
 
 	}
 
@@ -195,8 +196,8 @@ public class OrdforrAIListener extends ListenerAdapter {
 				{
 					LanguageWord lw = LanguageWord.newInstance(currentString, languageCode);
 					if(vls.isLongTermWord(lw)||!Dictionnary.isInDictionnaries(lw))
-					res+="***"+currentString+"***";
-					else if(vls.isShortTermWord(lw))
+						res+="***"+currentString+"***";
+					else if(vls.isEarlyPhaseWord(lw))
 						res+="*"+currentString+"*";
 					else if(vls.isMidTermWord(lw))
 						res+="**"+currentString+"**";
@@ -208,7 +209,7 @@ public class OrdforrAIListener extends ListenerAdapter {
 
 		if(!currentString.isEmpty())
 		{
-			if(vls.isShortTermWord(LanguageWord.newInstance(currentString, languageCode)))
+			if(vls.isEarlyPhaseWord(LanguageWord.newInstance(currentString, languageCode)))
 				res+="*"+currentString+"*";
 			else if(vls.isMidTermWord(LanguageWord.newInstance(currentString, languageCode)))
 				res+="**"+currentString+"**";
@@ -236,65 +237,39 @@ public class OrdforrAIListener extends ListenerAdapter {
 	}
 
 	public static void print(WordDescription description) {
+		print("||"+getHiddenAnswerStringFor(description)+"||");
+	}
+
+	public static String getHiddenAnswerStringFor(WordDescription description) {
+
 		String toPrint = "";//description.toString();
 		String translationText = "";
-		
+
 		String wordTypesToPrint = "";
-		
+
 		for(WordType wt:description.getWordTypes())
 		{
 			wordTypesToPrint+=wt+" "+description.getAlternativesFor(wt)+"\n";
 		}
-		
-		toPrint += wordTypesToPrint+"\n";
-		
-		
-		List<TranslationDescription> translations = description.getTranslations();
-		
-		Map<LanguageText, Set<TranslationDescription.Origin>> countPerTranslation = new HashMap<>();
-		for(TranslationDescription td: translations)
-		{
-			if(! countPerTranslation.containsKey(td.getTranslatedText())) countPerTranslation.put(td.getTranslatedText(), new HashSet<>());
-			countPerTranslation.get(td.getTranslatedText()).add(td.getOriginOfTranslation());
-		}
-		
-		List<LanguageText> textSortedByNumberOfOccurrences = countPerTranslation.keySet().stream()
-		.sorted((x,y)->-Integer.compare(countPerTranslation.get(x).size(), countPerTranslation.get(y).size()))
-		.collect(Collectors.toList());
-		
-		for(LanguageText currentText:textSortedByNumberOfOccurrences)
-		{
-			Set<TranslationDescription> translationsOfTheCurrentText = 
-					translations.stream()
-					.filter(x->x.getTranslatedText().equals(currentText))
-					.collect(Collectors.toSet());
-			
-			Set<String> translationOfTheCurrentTextWithAdvancedDescription = 
-					translationsOfTheCurrentText.stream().filter(x->!x.getAdvancedDescription().isBlank())
-					.map(x->x.getAdvancedDescription())
-					.collect(Collectors.toSet());
-			
-			Set<WordDescription.WordType> allTypes = translationsOfTheCurrentText.stream()
-					.map(x->x.getWordType())
-					.collect(Collectors.toSet());
-			
-			allTypes.remove(WordDescription.WordType.UNDEFINED);
-		/*	WordType officialType = WordType.UNDEFINED;
-			if(allTypes.size()>1) throw new Error();
-			if(allTypes.size() == 1) officialType = allTypes.iterator().next();*/
-			String typeString = allTypes.toString();
-			translationText+=currentText.getText()+" "+typeString.substring(1,typeString.length()-1);
-			for(String advanced : translationOfTheCurrentTextWithAdvancedDescription)
-				translationText=translationText + " "+advanced;
-			translationText+=" ("+countPerTranslation.get(currentText)+")\n";
-			/*for(TranslationDescription currentDescription:translations))
-			{
-				translationText+=s+"\n";
-			}*/
-		}
+
+		toPrint += wordTypesToPrint+"\n\n";
 
 
-		toPrint+=translationText+"\n\n";
+
+		
+
+
+		toPrint+=Translator.getNiceTranslationString(description.getWord(),true)+"\n\n";
+
+		toPrint+="Subforms:\n";
+
+		for(LanguageWord lw:description.getSubforms().getWords())
+		{
+			toPrint+=lw.getWord()+" "+
+					Translator.getNiceTranslationString(lw,false)+"\n";
+		}
+
+		toPrint+="\n";
 
 		List<StringPair> contextSentences = 
 				description.getContextSentences().stream()
@@ -313,12 +288,17 @@ public class OrdforrAIListener extends ListenerAdapter {
 		toPrint  = toPrint.substring(0,toPrint.length()-2);
 		if(toPrint.length()>2000)
 			toPrint = toPrint.substring(0,1980);
-		print("||"+toPrint+"||");
+		return toPrint;
 	}
 
 	public static void print(String toPrint) {
 		if(toPrint.isBlank())return;
-		OrdforrAIListener.discussionChannel.sendMessage(toPrint).queue();
+		while(toPrint.length()>2000)
+		{
+			OrdforrAIListener.discussionChannel.sendMessage(toPrint.substring(0, 2000)).queue();
+			toPrint = toPrint.substring(2000);
+		}
+			OrdforrAIListener.discussionChannel.sendMessage(toPrint).queue();
 	}
 
 	public static void playSoundFor(LanguageWord currentWordToAsk) {

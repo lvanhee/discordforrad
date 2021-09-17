@@ -1,11 +1,6 @@
 package discordforrad.models.language;
 
-import java.io.IOException;
-import java.nio.charset.Charset;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Collection;
-import java.util.HashSet;
+import java.io.Serializable;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -14,7 +9,7 @@ import discordforrad.LanguageCode;
 import discordforrad.inputUtils.TextInputUtils;
 
 
-public class LanguageText {
+public class LanguageText implements Serializable{
 	private final String text;
 	private final LanguageCode lc;
 
@@ -54,6 +49,10 @@ public class LanguageText {
 
 	public Set<LanguageWord> getSetOfValidWords() {
 		return getListOfValidWords().stream().collect(Collectors.toSet());
+	}
+
+	public static LanguageText newInstance(LanguageWord lw) {
+		return newInstance(lw.getCode(),lw.getWord());
 	}
 	
 }

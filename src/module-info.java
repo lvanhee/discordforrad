@@ -11,4 +11,6 @@ module discordforrad {
 	requires java.logging;
 	requires webscrapping;
 	requires lavaplayer;
+	requires cachingutils;
+	requires java.desktop;
 }

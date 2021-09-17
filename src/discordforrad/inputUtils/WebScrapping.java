@@ -8,21 +8,43 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
+import cachingutils.SplittedFileBasedCache;
 import discordforrad.LanguageCode;
+import discordforrad.inputUtils.databases.WordReferenceDBManager;
 import discordforrad.models.language.LanguageWord;
+import discordforrad.models.language.wordnetwork.forms.SingleEntryWebScrapping;
 import webscrapping.RobotBasedPageReader;
 import webscrapping.WebpageReader;
 
 public class WebScrapping {
 
 	public enum DataBaseEnum{
-		SO,SAOL,WORD_REFERENCE,BAB_LA
+		SAOL,SO,WORD_REFERENCE,BAB_LA
 	}
 
 	private static final Path CACHE_FILEPATH = Paths.get("data/cache/");
+
+	private static final class DbLwPair
+	{
+		private final DataBaseEnum db;
+		private final LanguageWord lw;
+
+		private DbLwPair(DataBaseEnum db, LanguageWord lw) {
+			this.db = db; this.lw = lw;
+		}
+
+		public static DbLwPair newInstance(DataBaseEnum db2, LanguageWord lw2) {
+			return new DbLwPair(db2, lw2);
+		}
+
+	}
 
 	public static File getCacheFileNameFor(DataBaseEnum db, LanguageWord lw)
 	{
@@ -35,43 +57,41 @@ public class WebScrapping {
 		return new File(cacheFileName);
 	}
 
-	public static String getContentsFromBabLa(LanguageWord lw)
-	{
 
-
-		if(getCacheFileNameFor(pageCode,lw).exists())
-		{
-			if(getCacheFileNameFor(pageCode,lw).exists())
-				try {
-					// default StandardCharsets.UTF_8
-					String content = Files.readString(getCacheFileNameFor(pageCode,lw).toPath(), StandardCharsets.ISO_8859_1);
-					if(!content.contains("\n"))
-					{
-						getCacheFileNameFor(pageCode, lw).delete();
-						return getContentsFromBabLa(lw);
-					}
-					return content;
-
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-		}
-
-
-		//String res = WebpageReader.downloadWebPage(pageCode, lw.toString());
+	public static final SplittedFileBasedCache<DbLwPair, String> cache = SplittedFileBasedCache.newInstance(
+			(DbLwPair dblw)-> getCacheFileNameFor(dblw.db, dblw.lw),
+			Function.identity(),
+			Function.identity()
+			);
 
 
 
-		saveOnCache(pageCode,lw, res);
-		return res;
-	}
-
-	public static String getContentsFrom(LanguageWord lw, DataBaseEnum db) {
+	private static boolean hasWordReferenceFailed = false;
+	public static DatabaseProcessingOutcome getContentsFrom(LanguageWord lw, DataBaseEnum db) {
+		if(hasWordReferenceFailed &&db.equals(DataBaseEnum.WORD_REFERENCE))
+			return FailedDatabaseProcessingOutcome.FAILED;
 		/*db = DataBaseEnum.SVENSKA_SE;
 		lw  =LanguageWord.newInstance("katt", LanguageCode.SV);*/
 		Set<String> pageToAskFor = new HashSet<>();
-
-		if(!isPossibleEntryFor(lw,db))return null;
+		final DbLwPair inputPair = DbLwPair.newInstance(db, lw);
+		
+		if(!isPossibleEntryFor(lw,db))
+			throw new Error();
+		
+		if(cache.has(inputPair))
+		{
+			String content = cache.get(inputPair);
+			if(!isValidlyLoadedContents(db,content))
+			{
+				cache.delete(inputPair);
+				//	Files.delete(getCacheFileNameFor(db,lw).toPath());
+				System.err.println("Deleting wrong input from:"+db+" "+lw);
+				return getContentsFrom(lw, db);
+				//		return SingleEntryWebScrapping.newInstance(content);
+			}
+			else return processToOutcomes(cache.get(inputPair),db);
+		}
+		
 		switch(db)
 		{
 		case WORD_REFERENCE:pageToAskFor.add("https://" + getWordReferenceWebPageName(lw)+lw.getWord()); break;
@@ -79,7 +99,7 @@ public class WebScrapping {
 			String indicator = db.toString().toLowerCase();
 			String last = "https://svenska.se/"+indicator+"/?sok="+lw.getWord();
 			pageToAskFor.add(last); 
-			String page = WebpageReader.downloadWebPage(last);
+			String page = WebpageReader.getWebclientWebPageContents(last);
 			if(page.contains("<div class=\"cshow\">"))
 			{
 				page = page.substring(page.indexOf("<div class=\"cshow\">"));
@@ -108,27 +128,17 @@ public class WebScrapping {
 			}
 			pageToAskFor.add("https://en.bab.la/dictionary/"+languageInPlainText+"-"+otherLanguageInPlainText+"/"+lw.getWord());
 			break;
-			
+
 		default:throw new Error();
 		}
 
 
-		if(getCacheFileNameFor(db,lw).exists())
-			try {
-				// default StandardCharsets.UTF_8
-				String content = Files.readString(
-						getCacheFileNameFor(db,lw).toPath(),
-						StandardCharsets.ISO_8859_1);
-				return content;
-
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
+		
 
 
 
 		//String res = RobotManager.getFullPageAsHtml(pageToAskFor);
-		String res =
+		String entries =
 				pageToAskFor.stream()
 				.map(
 						x->
@@ -136,13 +146,14 @@ public class WebScrapping {
 							final String startOfPageHtmlHeader = "<!--!!!START_OF_PAGE "+x+"!!!-->\n";
 							switch (db) {
 							case WORD_REFERENCE:case SO:case SAOL:
-								return startOfPageHtmlHeader+WebpageReader.downloadWebPage(x);
+								return startOfPageHtmlHeader+WebpageReader.getWebclientWebPageContents(x);
 							case BAB_LA: 	
 								String r = null;
 								while(r==null||!r.contains("\n"))
 								{
 									r = RobotBasedPageReader.getFullPageAsHtml(x);
-									System.out.println("Failure getting the page as HTML");
+									if(r.length()<1000)
+										throw new Error("Error processing "+x);
 								}
 								return startOfPageHtmlHeader+r;
 							default:
@@ -150,7 +161,7 @@ public class WebScrapping {
 							}
 						}
 						)
-				.filter(x->
+				/*.filter(x->
 				{
 					if(db.equals(DataBaseEnum.SO))
 					{
@@ -160,11 +171,54 @@ public class WebScrapping {
 					}
 					return true;
 				}
-					)
+						)*/
 				.reduce("", (x,y)->x+"\n"+y);
 
-		saveOnCache(db,lw, res);
-		return res;
+		if(!isValidlyLoadedContents(db, entries))
+		{
+			if(db.equals(DataBaseEnum.WORD_REFERENCE))
+			{
+				System.err.println("Word reference database has been already overused today");
+				hasWordReferenceFailed = true;
+			}
+			return FailedDatabaseProcessingOutcome.FAILED;
+		}
+		
+		cache.add(inputPair,entries);
+		 
+		return processToOutcomes(entries, db);
+	}
+
+	private static DatabaseProcessingOutcome processToOutcomes(String entry, DataBaseEnum db) {
+		if(! entry.contains("<!--!!!START_OF_PAGE "))return SingleEntryWebScrapping.newInstance(entry);
+		List<String> entries = Arrays.asList(entry.split("<!--!!!START_OF_PAGE "));
+		
+		Set<String> res = entries
+				.stream()
+				.filter(x->!x.isBlank())
+				.filter(x->isValidlyLoadedContents(db, x))
+				.collect(Collectors.toSet());
+		
+		if(res.size()==0)
+			return FailedDatabaseProcessingOutcome.FAILED;
+			
+		if(res.size()==1) 
+			return SingleEntryWebScrapping.newInstance(res.iterator().next());
+		return  EntriesFoundWebscrappingOutcome.newInstance(res);
+	}
+
+	private static boolean isValidlyLoadedContents(DataBaseEnum db, String content) {
+		if(db.equals(DataBaseEnum.WORD_REFERENCE)
+				&&!WordReferenceDBManager.isContentOfSuccessfullyLoadedPage(content))
+			return false;
+		
+		if(db.equals(DataBaseEnum.BAB_LA)&& content.length()<1000)
+			return false;
+		
+		if(content.equals("FAILED TO LOAD"))
+			return false;
+		
+		return true;
 	}
 
 	private static boolean isPossibleEntryFor(LanguageWord lw, DataBaseEnum db) {
@@ -173,21 +227,7 @@ public class WebScrapping {
 		return true;
 	}
 
-	private static void saveOnCache(DataBaseEnum db, LanguageWord lw, String res) {
-		File cacheFileName = getCacheFileNameFor(db, lw);
-		BufferedWriter writer;
-		try {
-			cacheFileName.createNewFile();
-			writer = new BufferedWriter(new FileWriter(cacheFileName,StandardCharsets.ISO_8859_1));
 
-			writer.write(res);
-
-			writer.close();
-		} catch (IOException e) {
-			e.printStackTrace();
-			System.out.println("Trying to save at:"+cacheFileName);
-		}
-	}
 
 	private static String getWordReferenceNameFor(LanguageCode code) {
 		switch (code) {
@@ -201,7 +241,22 @@ public class WebScrapping {
 	public static boolean isInDataBase(LanguageWord lw, DataBaseEnum db) {
 
 		if(!isPossibleEntryFor(lw, db))return false;
-		String webPageContents = WebScrapping.getContentsFrom(lw,db);
+		DatabaseProcessingOutcome contents = WebScrapping.getContentsFrom(lw,db);
+
+		if(contents instanceof NotFoundWebscrappingOutcome)return false;
+		
+		if(contents instanceof SingleEntryWebScrapping)
+			return isInDatabaseFromText(((SingleEntryWebScrapping)contents).get(), lw, db);
+		
+		Set<String> entries = ((EntriesFoundWebscrappingOutcome)contents).getEntries();
+
+		for(String s: entries)
+			if(isInDatabaseFromText(s,lw,db))return true;
+		return false;
+	}
+
+	private static boolean isInDatabaseFromText(String webPageContents, LanguageWord lw, DataBaseEnum db) {
+
 
 		switch(db)
 		{
@@ -212,13 +267,33 @@ public class WebScrapping {
 			boolean result = webPageContents.contains("Huvudsakliga översättningar")
 					|| webPageContents.contains("is an alternate term for") 
 					|| webPageContents.toLowerCase().contains("principal translations");
+			if(webPageContents.contains("WordReference kan inte översätta just den här frasen, men klicka på varje enskilt ord för att se vad det betyder:"))
+				result = false;
 			return result;
 
 		case SO:case SAOL:
 			String toStudy = webPageContents.replaceAll("\n", "").replaceAll("\r", "").replaceAll(" ", "");
-			boolean resultNotFound =toStudy.contains("Sökningenpå<strong>"+lw.getWord().replaceAll(" ", "")+"</strong>iSOgavingasvar."); 
+			boolean resultNotFound =toStudy.contains("Sökningenpå<strong>"+lw.getWord().replaceAll(" ", "")+"</strong>iSOgavingasvar.")||
+					toStudy.contains("Sökningenpå<strong>"+lw.getWord().replaceAll(" ", "")+"</strong>iSAOLgavingasvar."); 
 			return !resultNotFound;
+		case BAB_LA:
+			String otherLanguageInPlainText = null;
+			if(lw.getCode().equals(LanguageCode.EN))
+			{
+				otherLanguageInPlainText = "swedish";
+			}
+			if(lw.getCode().equals(LanguageCode.SV))
+			{
+				otherLanguageInPlainText = "english";
+			}
 
+			if(webPageContents.toLowerCase()
+					.contains("our team was informed that the translation for \""+lw.getWord()+"\" is missing"))
+				return false;	
+
+			result = webPageContents.toLowerCase().contains("\""+lw.getWord()+"\" in "+otherLanguageInPlainText);
+
+			return result;
 		default : throw new Error();
 		}
 	}

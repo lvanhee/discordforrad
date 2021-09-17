@@ -14,7 +14,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import discordforrad.LanguageCode;
-import discordforrad.inputUtils.RawLearningTextDatabaseManager;
+import discordforrad.inputUtils.UserLearningTextManager;
 import discordforrad.inputUtils.TextInputUtils;
 import discordforrad.models.language.LanguageText;
 import discordforrad.models.language.LanguageWord;
@@ -47,7 +47,7 @@ public class ReadThroughFocus {
 		input = input.replaceAll("\r", "");
 		for(String s: input.split("\n"))
 		{
-			String inputText = RawLearningTextDatabaseManager.fromID(s.substring(3));
+			String inputText = UserLearningTextManager.fromID(s.substring(3));
 			
 			LanguageText toAdd = LanguageText.newInstance(
 					LanguageCode.valueOf(s.substring(0,2)),
@@ -56,13 +56,11 @@ public class ReadThroughFocus {
 			
 			indexes.put(toAdd, s);
 		}
-		
-		
-		
+
 		return new ReadThroughFocus(texts, indexes);
 	}
 
-	public List<LanguageWord> getAllValidSortedWords() {
+	public List<LanguageWord> getAllValidWordsSortedByTheirOrderOfOccurrenceInFocusTexts() {
 		return texts.stream().map(x->x.getListOfValidWords()).reduce(new ArrayList<LanguageWord>(), (x,y)->{x.addAll(y); return x;});
 	}
 

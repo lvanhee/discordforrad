@@ -14,6 +14,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
@@ -25,6 +26,8 @@ import discordforrad.inputUtils.TextInputUtils;
 import discordforrad.models.language.Dictionnary;
 import discordforrad.models.language.LanguageText;
 import discordforrad.models.language.LanguageWord;
+import discordforrad.models.language.SuccessfulTranslationDescription;
+import discordforrad.models.language.TranslationDescription;
 
 public class VocabularyLearningStatus {
 	private static final Path FILEPATH = Paths.get("data/learned_words.txt");
@@ -35,7 +38,7 @@ public class VocabularyLearningStatus {
 	private static final int DEFAULT_LONG_TERM_WORDS_TO_LEARN_EVERY_SESSION = 10;
 	private final Map<LanguageWord, Integer> successfulLearningPerWord;
 	private final Map<LanguageWord, LocalDateTime> timeLastAttempt;
-	
+
 	public enum LearningStatus {IN_ACQUISITION, IN_CONSOLIDATION, LEARNED}
 
 
@@ -44,9 +47,9 @@ public class VocabularyLearningStatus {
 			Map<LanguageWord, LocalDateTime> m2)
 	{
 		Set<LanguageWord>toRemove =
-				m.keySet().stream().sorted((x,y)->x.toString().compareTo(y.toString()))
-				.filter(lw->!Dictionnary.isInDictionnaries(lw)).collect(Collectors.toSet());
-		
+				m.keySet().parallelStream().sorted((x,y)->x.toString().compareTo(y.toString()))
+				.filter(lw->!Dictionnary.isInDictionnariesWithCrosscheck(lw)).collect(Collectors.toSet());
+
 		for(LanguageWord lw:toRemove)
 			m.remove(lw);
 		this.successfulLearningPerWord = m;
@@ -79,39 +82,6 @@ public class VocabularyLearningStatus {
 		return new VocabularyLearningStatus(m, m2);
 	}
 
-
-	public void addFreeString(String lt, AddStringResultContext c, boolean isOriginalString, int recursivityDepth) {
-		Set<String> consideredWords = new HashSet<>();
-		if(!isOriginalString) consideredWords.add(lt);
-		else consideredWords = TextInputUtils.toListOfWords(lt).stream().collect(Collectors.toSet());
-
-		Set<LanguageWord> wordsToSearch = new HashSet<>();
-
-		for(String word : consideredWords)
-			for(LanguageCode lc: LanguageCode.values())
-				if(!word.isEmpty())
-					wordsToSearch.add(new LanguageWord(lc, word));
-		
-		AtomicInteger totalProcessed = new AtomicInteger();
-		
-		final Set<LanguageWord> finalWordsToSearch = wordsToSearch.stream().filter(x->!successfulLearningPerWord.containsKey(x)).collect(Collectors.toSet());
-
-		finalWordsToSearch.stream()//.filter(x->!successfulLearningPerWord.containsKey(x))
-		.forEach(lw ->
-		{
-			System.out.println(totalProcessed+"/"+finalWordsToSearch.size());
-			totalProcessed.incrementAndGet();
-			addWordToSearch(lw, c, recursivityDepth);
-		}
-				);
-
-		//if(isOriginalString)
-		updateFile();
-	}
-
-
-
-
 	private void addWordToSearch(LanguageWord lw, AddStringResultContext c, int recursivityDepth) {
 		if(successfulLearningPerWord.containsKey(lw))return;
 
@@ -126,11 +96,18 @@ public class VocabularyLearningStatus {
 
 		if(recursivityDepth>0)
 		{
-		for(String translation: Translator.getTranslation(lw.getWord().replaceAll("_", " "), 
-				lw.getCode(), LanguageCode.otherLanguage(lw.getCode())))
-			addFreeString(
-					translation,
-					c, false,recursivityDepth-1);
+			Set<TranslationDescription> allTranslations = 
+					Translator.getAllTranslations(
+							LanguageWord.newInstance(
+									lw.getWord().replaceAll("_", " "), 
+									lw.getCode()), LanguageCode.otherLanguage(lw.getCode()));
+			
+			
+			
+			for(TranslationDescription translation: allTranslations)
+				addFreeString(
+						((SuccessfulTranslationDescription)translation).getTranslatedText().getText(),
+						c, false,recursivityDepth-1);
 		}
 	}
 
@@ -167,7 +144,7 @@ public class VocabularyLearningStatus {
 	}*/
 
 
-	
+
 
 
 
@@ -216,7 +193,7 @@ public class VocabularyLearningStatus {
 
 	public Set<LanguageWord> getAllShortTermWords() {
 		return successfulLearningPerWord.keySet().stream().filter(x->
-		isShortTermWord(x)).collect(Collectors.toSet());
+		isEarlyPhaseWord(x)).collect(Collectors.toSet());
 	}
 
 
@@ -233,17 +210,19 @@ public class VocabularyLearningStatus {
 	}
 
 
-	public boolean isShortTermWord(LanguageWord newInstance) {
-		return getNumberOfSuccessLearning(newInstance)<SHORT_TERM_NUMBER_OF_REPEAT;
+	public boolean isEarlyPhaseWord(LanguageWord newInstance) {
+		return Dictionnary.isInDictionnaries(newInstance)&&
+				getNumberOfSuccessLearning(newInstance)<SHORT_TERM_NUMBER_OF_REPEAT;
 	}
-	
+
 	public boolean isMidTermWord(LanguageWord newInstance) {
-		return getNumberOfSuccessLearning(newInstance)<MID_TERM_NUMBER_OF_REPEAT &&
-				! isShortTermWord(newInstance);
+		return Dictionnary.isInDictionnaries(newInstance)&&
+				getNumberOfSuccessLearning(newInstance)<MID_TERM_NUMBER_OF_REPEAT &&
+				! isEarlyPhaseWord(newInstance);
 	}
-	
+
 	public boolean isLongTermWord(LanguageWord newInstance) {
-		return !isShortTermWord(newInstance)&&!isMidTermWord(newInstance);
+		return Dictionnary.isInDictionnaries(newInstance)&&!isEarlyPhaseWord(newInstance)&&!isMidTermWord(newInstance);
 	}
 
 
@@ -263,8 +242,8 @@ public class VocabularyLearningStatus {
 		int nbToPick = 
 				Math.min(nbToProcess,
 						getLearnableMidTermWords().size());
-		
-		
+
+
 		List<LanguageWord> learnableMidTerm = getLearnableMidTermWords().stream().collect(Collectors.toList());
 		Collections.shuffle(learnableMidTerm);
 		return learnableMidTerm.subList(0, nbToPick);
@@ -280,8 +259,8 @@ public class VocabularyLearningStatus {
 		int nbToPick = 
 				Math.min(Math.max(DEFAULT_LONG_TERM_WORDS_TO_LEARN_EVERY_SESSION, getLearnableLongTermWords().size()/10),
 						getLearnableLongTermWords().size());
-		
-		
+
+
 		List<LanguageWord> learnableMidTerm = getLearnableLongTermWords().stream().collect(Collectors.toList());
 		Collections.shuffle(learnableMidTerm);
 		return learnableMidTerm.subList(0, nbToPick);
@@ -305,15 +284,50 @@ public class VocabularyLearningStatus {
 
 
 	public LearningStatus getLearningStatus(LanguageWord x) {
-		if(isShortTermWord(x))
+		if(isEarlyPhaseWord(x))
 			return LearningStatus.IN_ACQUISITION;
 		if(isMidTermWord(x))
 			return LearningStatus.IN_CONSOLIDATION;
 		if(isLongTermWord(x))
 			return LearningStatus.LEARNED;
-		
+
 		throw new Error();
 	}
+
+	public static Map<LanguageText, Integer> getTranslationsOfWordsIKnowAndTheirFrequencyIn(
+			VocabularyLearningStatus vls,
+			LanguageCode originalLanguageCode)
+	{
+		Map<LanguageText, Integer> res = new HashMap<>();
+		Set<LanguageWord> originalLanguageWords = 
+				new TreeSet<>((x,y)->x.toString().compareTo(y.toString()));
+		originalLanguageWords.addAll(
+				VocabularyLearningStatus.getWordsKnownIn(vls,originalLanguageCode));
+		/*.stream().sorted(
+				(x,y)->x.toString().compareTo(y.toString())).collect(Collectors.toSet());*/
+		//	System.out.println(originalLanguageWords);
+		for(LanguageWord lw:originalLanguageWords)
+		{
+			//System.out.println(lw);
+			for(LanguageText translationOfLw: Translator.getAllTranslations(lw,LanguageCode.otherLanguage(originalLanguageCode)))
+			{
+				//	System.out.println(lw+":"+translationOfLw);
+				if(!res.containsKey(translationOfLw))
+					res.put(translationOfLw, 1);
+				else res.put(translationOfLw, res.get(translationOfLw)+1);
+			}
+		}
+
+		return res;
+	}
+
+
+	public static Set<LanguageWord> getWordsKnownIn(VocabularyLearningStatus vls, LanguageCode originalLanguageCode) {
+		return vls.getAllLongTermWords().stream()
+				.filter(x->x.getCode().equals(originalLanguageCode))
+				.collect(Collectors.toSet());
+	}
+
 
 
 

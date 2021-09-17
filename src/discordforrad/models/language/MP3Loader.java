@@ -10,6 +10,7 @@ import com.gargoylesoftware.htmlunit.javascript.host.file.File;
 
 import discordforrad.LanguageCode;
 import discordforrad.inputUtils.WebScrapping;
+import discordforrad.inputUtils.WebScrapping.DataBaseEnum;
 import webscrapping.WebpageReader;
 
 public class MP3Loader {
@@ -17,7 +18,7 @@ public class MP3Loader {
 	public static void getFluxFromBabLa(LanguageWord lw) {
 		if(Files.exists(Paths.get(getMP3FileNameFor(lw))))
 			return;
-	String page = WebScrapping.getContentsFromBabLa(lw);
+	String page = WebScrapping.getContentsFrom(lw,DataBaseEnum.BAB_LA);
 	
 	//List<String> lines = 
 			Arrays.asList(page.split("\n"))

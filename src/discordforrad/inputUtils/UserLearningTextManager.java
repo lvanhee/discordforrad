@@ -13,7 +13,7 @@ import java.util.Map;
 import java.util.Set;
 
 
-public class RawLearningTextDatabaseManager {
+public class UserLearningTextManager {
 	
 	private static final Path LOCATION_RAW_LEARNING_TEXT = Paths.get("data/raw_text_database.txt");
 	
@@ -68,6 +68,25 @@ public class RawLearningTextDatabaseManager {
 				//	SpecialCharacterManager.ISO_CHARSET,
 					StandardOpenOption.APPEND
 					);
+		} catch (IOException e) {
+			e.printStackTrace();
+			throw new Error();
+		}
+	}
+
+
+	public static Map<String, Integer> getAllOccurrencesOfEveryWord() {
+		try {
+			String fulltext = Files.readString(LOCATION_RAW_LEARNING_TEXT,Charset.forName("ISO-8859-1"));
+			List<String> allWords = TextInputUtils.toListOfWords(fulltext);
+			Map<String, Integer> countPerWord = new HashMap<>();
+			for(String s:allWords)
+			{
+				if(!countPerWord.containsKey(s))countPerWord.put(s, 0);
+				countPerWord.put(s, countPerWord.get(s)+1);
+			}
+			
+			return countPerWord;
 		} catch (IOException e) {
 			e.printStackTrace();
 			throw new Error();

@@ -20,26 +20,32 @@
 	<dependencies>
 		<dependency>
 			<groupId>webscrapping</groupId>
-  			<artifactId>webscrapping</artifactId>
-  			<version>0.0.1-SNAPSHOT</version>
+			<artifactId>webscrapping</artifactId>
+			<version>0.0.1-SNAPSHOT</version>
 		</dependency>
 		<dependency>
 			<groupId>net.dv8tion</groupId>
 			<artifactId>JDA</artifactId>
 			<version>4.2.1_255</version>
 		</dependency>
-		
+
 		<dependency>
 			<groupId>net.sourceforge.htmlunit</groupId>
 			<artifactId>htmlunit</artifactId>
 			<version>2.49.1</version>
 		</dependency>
-		  <dependency>
-    		<groupId>com.sedmelluq</groupId>
-    		<artifactId>lavaplayer</artifactId>
-    		<version>1.3.77</version>
-  		</dependency>
-  
+		<dependency>
+			<groupId>com.sedmelluq</groupId>
+			<artifactId>lavaplayer</artifactId>
+			<version>1.3.77</version>
+		</dependency>
+
+		<dependency>
+			<groupId>caching-utils</groupId>
+			<artifactId>caching-utils</artifactId>
+			<version>0.0.1-SNAPSHOT</version>
+		</dependency>
+
 	</dependencies>
 	<repositories>
 		<repository>
@@ -48,5 +54,5 @@
 			<url>https://m2.dv8tion.net/releases</url>
 		</repository>
 	</repositories>
-	
+
 </project>

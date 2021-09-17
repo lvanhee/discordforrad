@@ -1,9 +1,13 @@
-package discordforrad.models.language;
+package discordforrad.models.language.wordnetwork.forms;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
+import discordforrad.LanguageCode;
 import discordforrad.inputUtils.WebScrapping.DataBaseEnum;
+import discordforrad.models.language.LanguageWord;
+import discordforrad.models.language.WordDescription;
 import discordforrad.models.language.WordDescription.WordType;
 
 public interface RelatedForms {
@@ -31,46 +35,52 @@ public interface RelatedForms {
 	}
 	
 	public enum AdjectiveFormsEnum implements RelatedFormType {
-		ENN, ETT, DEFINED, PLURAL, MASCULINUM, COMPARATIVE, SUPERLATIVE, SUPERLATIVE_DEFINED		
+		ENN, ETT,  PLURAL, DEFINED,MASCULINUM, COMPARATIVE, SUPERLATIVE, SUPERLATIVE_DEFINED		
 	}
 	
 	public enum VerbAlternativeFormEnum implements RelatedFormType{
 		IMPERATIV, INFINITIV, PRESENS, PRETERITUM, SUPINUM,
 		PRESENS_PARTICIP, PAST_PARTICIP_ENN, PAST_PARTICIP_ETT, PAST_PARTICIP_PLUR, PERFEKT_PARTICIP_DEF,
-		INFINITIV_PASSIV, PRESENS_PASSIV, PRETERITUM_PASSIV, SUPINUM_PASSIV;
+		INFINITIV_PASSIV, PRESENS_PASSIV, PRETERITUM_PASSIV, SUPINUM_PASSIV, PRESENS_KUNJUNKTIV, PRETERITUM_KUNJUNKTIV;
 	}
 
 
-	public static RelatedForms parseFrom(String wholeForm, DataBaseEnum db) {
+	public static RelatedForms parseFrom(LanguageWord lw, String wholeForm, DataBaseEnum db) {
 
 		String comparedForm = wholeForm.replaceAll("\n", "").replaceAll("\r", "").replaceAll(" ", "");
 		if(comparedForm.contains("ingen</span><spanclass=\"tempmm\">böjning"))
-			return UnmodifiableAlternativeForm.INSTANCE;
+			return UnmodifiableAlternativeForm.newInstance(lw);
 
 		WordType wt = WordType.parseRaw(wholeForm, db);
 
 		if(wt.equals(WordType.ADV)
 				||wt.equals(WordType.CONJ)
+				||wt.equals(WordType.UNDEFINED)
 				||wt.equals(WordType.RAKN)
 				||wt.equals(WordType.INTERJ)
+				||wt.equals(WordType.NAME)
+				||wt.equals(WordType.PRON)
+				||wt.equals(WordType.ARTICLE)
 				||wt.equals(WordType.PREP))
-			return UnmodifiableAlternativeForm.INSTANCE;
+			return UnmodifiableAlternativeForm.newInstance(lw);
 		if(wt.equals(WordType.V))
 		{
-			String imperativAktiv = null;
-			String infinitivAktiv=null;
-			String presens = null;
-			String preteritumAktiv = null;
-			String supinumAktiv = null;
-			String presentParticip = null;
-			String pastParticipEnn = null;
-			String pastParticipEtt = null;
-			String pastParticipPlur = null;
-			String perfektParticipDef = null;
-			String presensPassiv = null;
-			String preteritumPassiv = null;
-			String infinitivPassiv = null;
-			String supinumPassiv = null;
+			LanguageWord imperativAktiv = null;
+			LanguageWord infinitivAktiv=null;
+			LanguageWord presens = null;
+			LanguageWord preteritumAktiv = null;
+			LanguageWord supinumAktiv = null;
+			LanguageWord presentParticip = null;
+			LanguageWord pastParticipEnn = null;
+			LanguageWord pastParticipEtt = null;
+			LanguageWord pastParticipPlur = null;
+			LanguageWord perfektParticipDef = null;
+			LanguageWord presensPassiv = null;
+			LanguageWord preteritumPassiv = null;
+			LanguageWord presensKonjunktiv = null;
+			LanguageWord infinitivPassiv = null;
+			LanguageWord supinumPassiv = null;
+			LanguageWord preteritumKonjunktiv = null;
 
 			if(db.equals(DataBaseEnum.SO))
 			{
@@ -78,14 +88,16 @@ public interface RelatedForms {
 				{
 					String infinitivStart = wholeForm.substring(wholeForm.indexOf("<span class=\"orto\">"));
 					String infinitivEnd = infinitivStart.substring(new String("<span class=\"orto\">").length(), infinitivStart.indexOf("</span>"));
-					infinitivAktiv = infinitivEnd.trim();
+					String payload = infinitivEnd.trim();
+					infinitivAktiv = LanguageWord.newInstance(payload,LanguageCode.SV);
 				}
 
 				if(wholeForm.contains("<span class=\"bojning\">"))
 				{
 					String pretetitumStart = wholeForm.substring(wholeForm.indexOf("<span class=\"bojning\">"));
 					String preteritumEnd = pretetitumStart.substring(new String("<span class=\"bojning\">").length(), pretetitumStart.indexOf("</span>"));
-					preteritumAktiv = preteritumEnd.trim();
+					String payload = preteritumEnd.trim();
+					preteritumAktiv = LanguageWord.newInstance(payload,LanguageCode.SV);
 				}
 
 				String remainingAfterPreteritum = wholeForm.substring(wholeForm.indexOf("<span class=\"bojning\">")+1);
@@ -94,7 +106,7 @@ public interface RelatedForms {
 				{
 					String imperativeStart = remainingAfterPreteritum.substring(remainingAfterPreteritum.indexOf("<span class=\"bojning\">"));
 					String supinumEnd = imperativeStart.substring(new String("<span class=\"bojning\">").length(), imperativeStart.indexOf("</span>"));
-					supinumAktiv = supinumEnd.trim();
+					supinumAktiv = LanguageWord.newInstance(supinumEnd.trim(),LanguageCode.SV);
 				}
 			}
 			else if(db.equals(DataBaseEnum.SAOL))
@@ -116,11 +128,13 @@ public interface RelatedForms {
 							String payload = subbit.substring(0, subbit.indexOf("</span>")).trim();
 							String type = subbit.substring(subbit.indexOf(subsplitType)+subsplitType.length());
 							type = type.substring(0,type.indexOf("</td>")).trim();
-							if(type.equals("presens aktiv")) {presens = payload; continue;}
-							if(type.equals("preteritum aktiv")) {preteritumAktiv = payload; continue;}
-							if(type.equals("imperativ aktiv")) {imperativAktiv = payload; continue;}
-							if(type.equals("presens passiv")) {presensPassiv = payload; continue;}
-							if(type.equals("preteritum passiv")) {preteritumPassiv = payload; continue;}
+							if(type.equals("presens aktiv")||type.equals("presens deponens")) {presens = LanguageWord.newInstance(payload,LanguageCode.SV);; continue;}
+							if(type.equals("preteritum aktiv")||type.equals("preteritum deponens")) {preteritumAktiv = LanguageWord.newInstance(payload,LanguageCode.SV);; continue;}
+							if(type.equals("imperativ aktiv")||type.equals("imperativ deponens")) {imperativAktiv = LanguageWord.newInstance(payload,LanguageCode.SV);; continue;}
+							if(type.equals("presens passiv")) {presensPassiv = LanguageWord.newInstance(payload,LanguageCode.SV);; continue;}
+							if(type.equals("preteritum passiv")) {preteritumPassiv = LanguageWord.newInstance(payload,LanguageCode.SV);; continue;}
+							if(type.equals("presens konjunktiv")) {presensKonjunktiv = LanguageWord.newInstance(payload,LanguageCode.SV);; continue;}
+							if(type.equals("preteritum konjunktiv")) {preteritumKonjunktiv = LanguageWord.newInstance(payload,LanguageCode.SV);; continue;}
 							throw new Error();
 						}
 						continue;
@@ -141,8 +155,8 @@ public interface RelatedForms {
 						if(!bit.contains(subsplitType))continue;
 						String type = bit.substring(bit.indexOf(subsplitType)+subsplitType.length());
 						type = type.substring(0,type.indexOf("</td>")).trim();
-						if(type.equals("infinitiv aktiv")) {infinitivAktiv=payload;}
-						else if(type.equals("infinitiv passiv"))infinitivPassiv = payload;
+						if(type.equals("infinitiv aktiv")||type.equals("infinitiv deponens")) {infinitivAktiv=LanguageWord.newInstance(payload,LanguageCode.SV);}
+						else if(type.equals("infinitiv passiv"))infinitivPassiv = LanguageWord.newInstance(payload,LanguageCode.SV);
 						else throw new Error();
 						continue;
 					}
@@ -151,15 +165,15 @@ public interface RelatedForms {
 						String payload = bit.substring(bit.indexOf(PAYLOAD_BEACON_SAOL)+PAYLOAD_BEACON_SAOL.length(), bit.indexOf("</span>")).trim();
 						String type = bit.substring(bit.indexOf(subsplitType)+subsplitType.length());
 						type = type.substring(0,type.indexOf("</td>")).trim();
-						if(type.equals("supinum aktiv"))supinumAktiv=payload;
-						else if(type.equals("supinum passiv"))supinumPassiv = payload;
+						if(type.equals("supinum aktiv")||type.equals("supinum deponens"))supinumAktiv=LanguageWord.newInstance(payload,LanguageCode.SV);
+						else if(type.equals("supinum passiv"))supinumPassiv = LanguageWord.newInstance(payload,LanguageCode.SV);
 						else throw new Error();
 						continue;
 					}
 					if(bit.trim().startsWith("Presens particip"))
 					{
 						String payload = bit.substring(bit.indexOf(PAYLOAD_BEACON_SAOL)+PAYLOAD_BEACON_SAOL.length(), bit.indexOf("</span>")).trim();
-						presentParticip=payload;
+						presentParticip=LanguageWord.newInstance(payload,LanguageCode.SV);
 						continue;
 					}
 
@@ -167,25 +181,25 @@ public interface RelatedForms {
 					if(bit.trim().startsWith("en"))
 					{
 						String payload = bit.substring(bit.indexOf(PAYLOAD_BEACON_SAOL)+PAYLOAD_BEACON_SAOL.length(), bit.indexOf("</span>")).trim();
-						pastParticipEnn=payload;
+						pastParticipEnn=LanguageWord.newInstance(payload,LanguageCode.SV);;
 						continue;
 					}
 					if(bit.trim().startsWith("ett"))
 					{
 						String payload = bit.substring(bit.indexOf(PAYLOAD_BEACON_SAOL)+PAYLOAD_BEACON_SAOL.length(), bit.indexOf("</span>")).trim();
-						pastParticipEtt=payload;
+						pastParticipEtt=LanguageWord.newInstance(payload,LanguageCode.SV);;
 						continue;
 					}
 					if(bit.trim().startsWith("den/det/de"))
 					{
 						String payload = bit.substring(bit.indexOf(PAYLOAD_BEACON_SAOL)+PAYLOAD_BEACON_SAOL.length(), bit.indexOf("</span>")).trim();
-						pastParticipPlur=payload;
+						pastParticipPlur=LanguageWord.newInstance(payload,LanguageCode.SV);;
 						continue;
 					}
 					if(bit.substring(0,bit.indexOf("<")).trim().equals("den"))
 					{
 						String payload = bit.substring(bit.indexOf(PAYLOAD_BEACON_SAOL)+PAYLOAD_BEACON_SAOL.length(), bit.indexOf("</span>")).trim();
-						perfektParticipDef=payload;
+						perfektParticipDef=LanguageWord.newInstance(payload,LanguageCode.SV);;
 						continue;
 					}
 					/*if(bit.trim().startsWith("Positiv"))continue;
@@ -209,157 +223,172 @@ public interface RelatedForms {
 					}*/
 					if(bit.substring(0,bit.indexOf("<")).trim().equals("Ordform(er)"))continue;
 					if(bit.substring(0,bit.indexOf("<")).trim().equals("Övrig(a) form(er)"))continue;
-					throw new Error();
+
 				}
 			}
 
 			return VerbAlternativeForm.newInstance(imperativAktiv,
-					infinitivAktiv, presens, preteritumAktiv, supinumAktiv,
+					infinitivAktiv, presens, presensKonjunktiv, preteritumAktiv, presensKonjunktiv,supinumAktiv,
 					presentParticip,pastParticipEnn,pastParticipEtt,pastParticipPlur,perfektParticipDef,
 					presensPassiv, preteritumPassiv, infinitivPassiv, supinumPassiv);			
 		}
 		if(wt.equals(WordType.N))
-			return parseNoun(wholeForm,db);
-		if(wt.equals(WordType.PRON))
-			return parsePronoun(wholeForm,db);
+			return parseNoun(wholeForm,db,lw);
+		/*if(wt.equals(WordType.PRON))
+			return parsePronoun(wholeForm,db);*/
 
 		if(wt.equals(WordType.ADJ))
 		{
-			String enn = null;
-			String ett = null;
-			String defined = null;
-			String plural = null;
-			String masculinum = null;
-			String superlativ = null;
-			String superlativDefined = null;
-			String komparativ = null;
-
-			if(db.equals(DataBaseEnum.SO))
-			{
-				if(wholeForm.contains("<span class=\"orto\">"))
-				{
-					String infinitivStart = wholeForm.substring(wholeForm.indexOf("<span class=\"orto\">"));
-					String infinitivEnd = infinitivStart.substring(new String("<span class=\"orto\">").length(), infinitivStart.indexOf("</span>"));
-					enn = infinitivEnd.trim();
-				}
-
-				for(String split:wholeForm.split("<span class=\"tempmm\">"))
-				{
-					if(split.contains("<span class=\"orto\">"))continue;
-					if(!split.contains("<span class=\"bojning\">"))continue;
-
-					String payloadStart = split.substring(split.indexOf("<span class=\"bojning\">"));
-					String payloadEnd = payloadStart.substring(new String("<span class=\"bojning\">").length(), payloadStart.indexOf("</span>"));
-					String actualContents = payloadEnd.trim().replaceAll("-", "");
-
-					if(split.contains("maskulinum"))
-						masculinum = actualContents;
-					else if(split.contains("superlativ"))
-						superlativ = actualContents;
-					else if(split.trim().startsWith("neutrum"))
-					{
-						enn = actualContents;
-						ett = actualContents;
-					}
-					else if(split.trim().startsWith("plural"))
-					{
-						plural = actualContents;
-					}
-					else if(split.trim().startsWith("används"))continue;
-					else if(split.trim().startsWith("komparativ"))komparativ = actualContents;
-					else
-						throw new Error();
-				}
-
-			}
-			else if(db.equals(DataBaseEnum.SAOL))
-			{
-				final int DEFAULT = 0;
-				final int KOMPARATIV = 1;
-				final int SUPERLATIV = 2;
-				int mode = DEFAULT;
-
-				String forms = wholeForm.substring(wholeForm.indexOf(SAOL_FORMS_SPLITTER_TOKEN));
-				
-				boolean isUnmodifiableAdjective = wholeForm.substring(0, wholeForm.indexOf("<")).trim()
-						.equals("oböjligt adjektiv");
-
-				String startingPattern = "<span class=\"bform\">";
-				for(String bit : forms.split("<i>"))
-				{
-					if(bit.startsWith("<span class=\"expansion\""))continue;
-					String header = bit.substring(0,bit.indexOf("<")).trim();
-					if(header.equals("Ordform(er)"))continue;
-					if(header.equals("Övrig(a) ordform(er)"))continue;
-					if(header.startsWith("Positiv"))continue;
-					if(header.startsWith("Substantiverat adjektiv"))continue;
-					if((header.equals("en")||header.equals("en/ett/den/det/de"))&&mode==DEFAULT
-							||(header.equals("är")&& isUnmodifiableAdjective)
-							)
-					{
-						String startEnn = bit.substring(bit.indexOf(startingPattern)+startingPattern.length());
-						enn = startEnn.substring(0,startEnn.indexOf("</span>")).trim();
-						continue;
-					}
-					if(bit.trim().startsWith("ett"))
-					{
-						String startEtt = bit.substring(bit.indexOf(startingPattern)+startingPattern.length());
-						ett = startEtt.substring(0,startEtt.indexOf("</span>")).trim();
-						continue;
-					}
-					if(bit.trim().startsWith("den/det/de"))
-					{
-						String startPlural = bit.substring(bit.indexOf(startingPattern)+startingPattern.length());
-						String payload = startPlural.substring(0,startPlural.indexOf("</span>")).trim(); 
-						if(mode==DEFAULT)plural = payload;
-						else if(mode==SUPERLATIV)superlativDefined = payload;
-						else throw new Error();
-						continue;
-					}
-					if(bit.trim().startsWith("den\r"))
-					{
-						String startDefinite = bit.substring(bit.indexOf(startingPattern)+startingPattern.length());
-						defined = startDefinite.substring(0,startDefinite.indexOf("</span>")).trim();
-						continue;
-					}
-					if(bit.trim().startsWith("Komparativ\r"))
-					{
-						mode = KOMPARATIV;
-						continue;
-					}
-					if(bit.trim().startsWith("Superlativ\r"))
-					{
-						mode = SUPERLATIV;
-						continue;
-					}
-					if(mode==KOMPARATIV&&bit.trim().startsWith("en/ett/den/det/de"))
-					{
-						String startKomparativ = bit.substring(bit.indexOf(startingPattern)+startingPattern.length());
-						komparativ = startKomparativ.substring(0,startKomparativ.indexOf("</span>")).trim();
-						continue;
-					}
-
-					if(mode==SUPERLATIV&&header.equals("är"))
-					{
-						String startSuperlativ = bit.substring(bit.indexOf(startingPattern)+startingPattern.length());
-						superlativ = startSuperlativ.substring(0,startSuperlativ.indexOf("</span>")).trim();
-						continue;
-					}
-					throw new Error();
-				}
-
-
-			}
-
-			return AdjectiveRelatedForms.newInstance(enn,ett,plural,defined,masculinum,komparativ, superlativ,superlativDefined);
-
+			return parseAdjective(wholeForm, db);
 		}
 		throw new Error();
 	}
 
 
+	public static RelatedForms parseAdjective(String wholeForm, DataBaseEnum db) {
+		LanguageWord enn = null;
+		LanguageWord ett = null;
+		LanguageWord defined = null;
+		LanguageWord plural = null;
+		LanguageWord masculinum = null;
+		LanguageWord superlativ = null;
+		LanguageWord superlativDefined = null;
+		LanguageWord komparativ = null;
+		LanguageWord komparativDefined = null;
+
+		if(db.equals(DataBaseEnum.SO))
+		{
+			if(wholeForm.contains("<span class=\"orto\">"))
+			{
+				String infinitivStart = wholeForm.substring(wholeForm.indexOf("<span class=\"orto\">"));
+				String infinitivEnd = infinitivStart.substring(new String("<span class=\"orto\">").length(), infinitivStart.indexOf("</span>"));
+				enn = LanguageWord.newInstance(infinitivEnd.trim(), LanguageCode.SV);
+			}
+
+			for(String split:wholeForm.split("<span class=\"tempmm\">"))
+			{
+				if(split.contains("<span class=\"orto\">"))continue;
+				if(!split.contains("<span class=\"bojning\">"))continue;
+
+				String payloadStart = split.substring(split.indexOf("<span class=\"bojning\">"));
+				String payloadEnd = payloadStart.substring(new String("<span class=\"bojning\">").length(), payloadStart.indexOf("</span>"));
+				String actualContents = payloadEnd.trim().replaceAll("-", "");
+
+				if(split.contains("maskulinum"))
+					masculinum = LanguageWord.newInstance(actualContents.trim(), LanguageCode.SV);
+				else if(split.contains("superlativ"))
+					superlativ = LanguageWord.newInstance(actualContents.trim(), LanguageCode.SV);
+				else if(split.trim().startsWith("neutrum"))
+				{
+					enn = LanguageWord.newInstance(actualContents.trim(), LanguageCode.SV);
+					ett = LanguageWord.newInstance(actualContents.trim(), LanguageCode.SV);
+				}
+				else if(split.trim().startsWith("plural"))
+				{
+					plural = LanguageWord.newInstance(actualContents.trim(), LanguageCode.SV);
+				}
+				else if(split.trim().startsWith("används"))continue;
+				else if(split.trim().startsWith("komparativ"))komparativ = LanguageWord.newInstance(actualContents.trim(), LanguageCode.SV);
+				else continue;
+//					throw new Error();
+			}
+
+		}
+		else if(db.equals(DataBaseEnum.SAOL))
+		{
+			final int DEFAULT = 0;
+			final int KOMPARATIV = 1;
+			final int SUPERLATIV = 2;
+			int mode = DEFAULT;
+
+			String forms = wholeForm.substring(wholeForm.indexOf(SAOL_FORMS_SPLITTER_TOKEN));
+			
+			boolean isUnmodifiableAdjective = wholeForm.substring(0, wholeForm.indexOf("<")).trim()
+					.equals("oböjligt adjektiv");
+
+			String startingPattern = "<span class=\"bform\">";
+			for(String bit : forms.split("<i>"))
+			{
+				if(bit.startsWith("<span class=\"expansion\""))continue;
+				String header = bit.substring(0,bit.indexOf("<")).trim();
+				if(header.equals("Ordform(er)"))continue;
+				if(header.equals("Övrig(a) ordform(er)"))continue;
+				if(header.startsWith("Positiv"))continue;
+				if(header.startsWith("Substantiverat adjektiv"))continue;
+				if((header.equals("en")||header.startsWith("en/"))
+						&&mode==DEFAULT
+						||(header.equals("är")&& isUnmodifiableAdjective)
+						)
+				{
+					String startEnn = bit.substring(bit.indexOf(startingPattern)+startingPattern.length());
+					startEnn= startEnn.substring(0,startEnn.indexOf("</span>")).trim();
+					enn = LanguageWord.newInstance(startEnn, LanguageCode.SV);
+					continue;
+				}
+				if(header.equals("ett"))
+				{
+					String startEtt = bit.substring(bit.indexOf(startingPattern)+startingPattern.length());
+					startEtt= startEtt.substring(0,startEtt.indexOf("</span>")).trim();
+					ett = LanguageWord.newInstance(startEtt, LanguageCode.SV);
+					continue;
+				}
+				if(header.equals("den/det/de")||header.equals("de"))
+				{
+					String startPlural = bit.substring(bit.indexOf(startingPattern)+startingPattern.length());
+					String payload = startPlural.substring(0,startPlural.indexOf("</span>")).trim(); 
+					if(mode==DEFAULT)plural = LanguageWord.newInstance(payload, LanguageCode.SV);
+					else if(mode==SUPERLATIV)superlativDefined = LanguageWord.newInstance(payload, LanguageCode.SV);
+					else if(mode==KOMPARATIV)komparativDefined = LanguageWord.newInstance(payload, LanguageCode.SV);
+					else 
+						throw new Error();
+					continue;
+				}
+				if( header.equals("den")||header.equals("den/det"))
+				{
+					String startDefinite = bit.substring(bit.indexOf(startingPattern)+startingPattern.length());
+					startDefinite= startDefinite.substring(0,startDefinite.indexOf("</span>")).trim();
+					defined = LanguageWord.newInstance(startDefinite, LanguageCode.SV);
+					continue;
+				}
+				if(bit.trim().startsWith("Komparativ\r")||header.equals("Adjektiv (i komparativ)"))
+				{
+					mode = KOMPARATIV;
+					continue;
+				}
+				if(bit.trim().startsWith("Superlativ\r"))
+				{
+					mode = SUPERLATIV;
+					continue;
+				}
+				if(mode==KOMPARATIV&&bit.trim().startsWith("en/ett/den/det/de"))
+				{
+					String startKomparativ = bit.substring(bit.indexOf(startingPattern)+startingPattern.length());
+					startKomparativ= startKomparativ.substring(0,startKomparativ.indexOf("</span>")).trim();
+					komparativ = LanguageWord.newInstance(startKomparativ, LanguageCode.SV);
+					continue;
+				}
+
+				if(mode==SUPERLATIV&&header.equals("är"))
+				{
+					String startSuperlativ = bit.substring(bit.indexOf(startingPattern)+startingPattern.length());
+					startSuperlativ = startSuperlativ.substring(0,startSuperlativ.indexOf("</span>")).trim();
+					superlativ = LanguageWord.newInstance(startSuperlativ, LanguageCode.SV);
+					continue;
+				}
+				if(header.equals("Adverb"))continue; //some words are both adjectives and adverbs; the splitting is not so great
+				//if useful, have the system checkout for such splits and return sets of forms instead
+				throw new Error();
+			}
+
+
+		}
+
+		return AdjectiveRelatedForms.newInstance(enn,ett,plural,defined,masculinum,komparativ, superlativ,superlativDefined);
+	}
+
+
 	public static RelatedForms parsePronoun(String wholeForm, DataBaseEnum db) {
-		Map<PronounFormEnum, String> res = new HashMap<>();
+		Map<PronounFormEnum, LanguageWord> res = new HashMap<>();
 		if(db.equals(DataBaseEnum.SAOL))
 		{
 			String forms = wholeForm.substring(wholeForm.indexOf(SAOL_FORMS_SPLITTER_TOKEN));
@@ -386,23 +415,34 @@ public interface RelatedForms {
 				typeRelation = typeRelation.substring(0,typeRelation.indexOf("<")).trim();
 
 				if(typeRelation.equals("grundform utrum"))
-					if(mode==SINGULAR) {res.put(PronounFormEnum.GRUNDFORM_UTRUM_SINGULAR, payload); continue;}
-					else if(mode==PLURAL) {res.put(PronounFormEnum.GRUNDFORM_UTRUM_PLURAL, payload); continue;}
+					if(mode==SINGULAR) {res.put(PronounFormEnum.GRUNDFORM_UTRUM_SINGULAR, LanguageWord.newInstance(payload, LanguageCode.SV)); continue;}
+					else if(mode==PLURAL) {res.put(PronounFormEnum.GRUNDFORM_UTRUM_PLURAL, LanguageWord.newInstance(payload, LanguageCode.SV)); continue;}
 				if(typeRelation.equals("grundform neutrum"))
-					if(mode==SINGULAR) {res.put(PronounFormEnum.GRUNDFORM_NEUTRUM, payload); continue;}
+					if(mode==SINGULAR) {res.put(PronounFormEnum.GRUNDFORM_NEUTRUM, LanguageWord.newInstance(payload, LanguageCode.SV)); continue;}
 				if(typeRelation.equals("grundform"))
-					if(mode==PLURAL) {res.put(PronounFormEnum.GRUNDFORM_PLURAL, payload); continue;}	
+					if(mode==PLURAL) {res.put(PronounFormEnum.GRUNDFORM_PLURAL, LanguageWord.newInstance(payload, LanguageCode.SV)); continue;}	
 				if(typeRelation.equals("genitiv utrum"))
-					if(mode==SINGULAR) {res.put(PronounFormEnum.GENITIV_UTRUM_SINGULAR, payload); continue;}	
+					if(mode==SINGULAR) {res.put(PronounFormEnum.GENITIV_UTRUM_SINGULAR, LanguageWord.newInstance(payload, LanguageCode.SV)); continue;}	
 				if(typeRelation.equals("objektsform"))
-					if(mode==SINGULAR) {res.put(PronounFormEnum.OBJEKTSFORM_SINGULAR, payload); continue;}
-					else if(mode==PLURAL) {res.put(PronounFormEnum.OBJEKTSFORM_PLURAL, payload); continue;}
+					if(mode==SINGULAR) {res.put(PronounFormEnum.OBJEKTSFORM_SINGULAR, LanguageWord.newInstance(payload, LanguageCode.SV)); continue;}
+					else if(mode==PLURAL) {res.put(PronounFormEnum.OBJEKTSFORM_PLURAL, LanguageWord.newInstance(payload, LanguageCode.SV)); continue;}
 				
 				
 			//	throw new Error();
 			}
 
 		}
+		else if(db.equals(DataBaseEnum.SO))
+		{
+			String header = "<span class=\"orto\">";
+			String payload = wholeForm.substring(
+					wholeForm.indexOf(header)+header.length());
+			payload  =payload.substring(0,payload.indexOf("<")).trim();
+			
+			res.put(PronounFormEnum.GRUNDFORM_UTRUM_SINGULAR, LanguageWord.newInstance(payload,LanguageCode.SV));
+					
+		}
+		
 
 		return PronounRelatedForm.newInstance(res);
 	}
@@ -410,8 +450,8 @@ public interface RelatedForms {
 
 	public static final String SAOL_PAYLOAD_INDICATOR = "<span class=\"bform\">";
 	public static final String SAOL_RELATION_INDICATOR = "<td class=\"ledtext\">";
-	public static RelatedForms parseNoun(String wholeForm, DataBaseEnum db) {
-		Map<NounFormEnum, String> res = new HashMap<>();
+	public static RelatedForms parseNoun(String wholeForm, DataBaseEnum db, LanguageWord lw) {
+		Map<NounFormEnum, LanguageWord> res = new HashMap<>();
 
 		if(db.equals(DataBaseEnum.SAOL))
 		{
@@ -424,7 +464,11 @@ public interface RelatedForms {
 			
 			String wholeHeader = wholeForm.substring(0,wholeForm.indexOf("<")).trim();
 			boolean isSpecialAdjective = wholeHeader.equals("adjektiviskt slutled")||wholeHeader.equals("oböjligt substantiv");
-
+			
+			if(isSpecialAdjective)
+			{
+				return UnmodifiableAlternativeForm.newInstance(lw);
+			}
 			for(String bit : forms.split("<b>|<i>"))
 			{
 				/*	if(bit.contains("<i>") &&bit.substring(bit.indexOf("<i>")+3,bit.indexOf("</i>")).trim().equals("Singular"))
@@ -440,22 +484,22 @@ public interface RelatedForms {
 				typeRelation = typeRelation.substring(0,typeRelation.indexOf("<")).trim();
 
 				if(typeRelation.equals("obestämd form"))
-					if(mode==SINGULAR) {res.put(NounFormEnum.OBESTAMD_FORM_SINGULAR, payload); continue;}
-					else if(mode==PLURAL) {res.put(NounFormEnum.OBESTAMD_FORM_PLURAL, payload); continue;}
+					if(mode==SINGULAR) {res.put(NounFormEnum.OBESTAMD_FORM_SINGULAR, LanguageWord.newInstance(payload, LanguageCode.SV)); continue;}
+					else if(mode==PLURAL) {res.put(NounFormEnum.OBESTAMD_FORM_PLURAL, LanguageWord.newInstance(payload, LanguageCode.SV)); continue;}
 				if(typeRelation.equals("obestämd form genitiv"))
-					if(mode==SINGULAR) {res.put(NounFormEnum.OBESTAMD_FORM_GENITIV_SINGULAR, payload); continue;}
-					else if(mode==PLURAL) {res.put(NounFormEnum.OBESTAMD_FORM_GENITIV_PLURAL, payload); continue;}
+					if(mode==SINGULAR) {res.put(NounFormEnum.OBESTAMD_FORM_GENITIV_SINGULAR, LanguageWord.newInstance(payload, LanguageCode.SV)); continue;}
+					else if(mode==PLURAL) {res.put(NounFormEnum.OBESTAMD_FORM_GENITIV_PLURAL, LanguageWord.newInstance(payload, LanguageCode.SV)); continue;}
 				if(typeRelation.equals("bestämd form"))
-					if(mode==SINGULAR) {res.put(NounFormEnum.BESTAMD_FORM_SINGULAR, payload); continue;}
-					else if(mode==PLURAL) {res.put(NounFormEnum.BESTAMD_FORM_PLURAL, payload); continue;}
+					if(mode==SINGULAR) {res.put(NounFormEnum.BESTAMD_FORM_SINGULAR, LanguageWord.newInstance(payload, LanguageCode.SV)); continue;}
+					else if(mode==PLURAL) {res.put(NounFormEnum.BESTAMD_FORM_PLURAL, LanguageWord.newInstance(payload, LanguageCode.SV)); continue;}
 				if(typeRelation.equals("bestämd form genitiv"))
-					if(mode==SINGULAR) {res.put(NounFormEnum.BESTAMD_FORM_GENITIV_SINGULAR, payload); continue;}
-					else if(mode==PLURAL) {res.put(NounFormEnum.BESTAMD_FORM_GENITIV_PLURAL, payload); continue;}
+					if(mode==SINGULAR) {res.put(NounFormEnum.BESTAMD_FORM_GENITIV_SINGULAR, LanguageWord.newInstance(payload, LanguageCode.SV)); continue;}
+					else if(mode==PLURAL) {res.put(NounFormEnum.BESTAMD_FORM_GENITIV_PLURAL, LanguageWord.newInstance(payload, LanguageCode.SV)); continue;}
 				if(typeRelation.equals("i vissa uttryck"))
-				{res.put(NounFormEnum.OTHER, payload); continue;}
+				{res.put(NounFormEnum.OTHER, LanguageWord.newInstance(payload, LanguageCode.SV)); continue;}
 
 				if(header.isBlank() && isSpecialAdjective) continue;
-				throw new Error();
+				//throw new Error();
 			}
 			/*final int DEFAULT = 0;
 			final int KOMPARATIV = 1;
@@ -529,22 +573,14 @@ public interface RelatedForms {
 			{
 				String infinitivStart = wholeForm.substring(wholeForm.indexOf("<span class=\"orto\">"));
 				String payload = infinitivStart.substring(new String("<span class=\"orto\">").length(), infinitivStart.indexOf("</span>")).trim();
-				res.put(NounFormEnum.OBESTAMD_FORM_SINGULAR,payload);
+				res.put(NounFormEnum.OBESTAMD_FORM_SINGULAR,LanguageWord.newInstance(payload, LanguageCode.SV));
 			}
 
 			if(wholeForm.contains("<span class=\"bojning\">"))
 			{
 				String pretetitumStart = wholeForm.substring(wholeForm.indexOf("<span class=\"bojning\">"));
 				String payload = pretetitumStart.substring(new String("<span class=\"bojning\">").length(), pretetitumStart.indexOf("</span>")).trim();
-				res.put(NounFormEnum.BESTAMD_FORM_SINGULAR,payload);
-			}
-
-			wholeForm = wholeForm.substring(wholeForm.indexOf("<span class=\"bojning\">")+1);
-			if(wholeForm.contains("<span class=\"bojning\">"))
-			{
-				String pretetitumStart = wholeForm.substring(wholeForm.indexOf("<span class=\"bojning\">"));
-				String payload = pretetitumStart.substring(new String("<span class=\"bojning\">").length(), pretetitumStart.indexOf("</span>")).trim();
-				res.put(NounFormEnum.OBESTAMD_FORM_PLURAL,payload);
+				res.put(NounFormEnum.BESTAMD_FORM_SINGULAR,LanguageWord.newInstance(payload, LanguageCode.SV));
 			}
 
 			wholeForm = wholeForm.substring(wholeForm.indexOf("<span class=\"bojning\">")+1);
@@ -552,7 +588,15 @@ public interface RelatedForms {
 			{
 				String pretetitumStart = wholeForm.substring(wholeForm.indexOf("<span class=\"bojning\">"));
 				String payload = pretetitumStart.substring(new String("<span class=\"bojning\">").length(), pretetitumStart.indexOf("</span>")).trim();
-				res.put(NounFormEnum.OBESTAMD_FORM_PLURAL,payload);
+				res.put(NounFormEnum.OBESTAMD_FORM_PLURAL,LanguageWord.newInstance(payload, LanguageCode.SV));
+			}
+
+			wholeForm = wholeForm.substring(wholeForm.indexOf("<span class=\"bojning\">")+1);
+			if(wholeForm.contains("<span class=\"bojning\">"))
+			{
+				String pretetitumStart = wholeForm.substring(wholeForm.indexOf("<span class=\"bojning\">"));
+				String payload = pretetitumStart.substring(new String("<span class=\"bojning\">").length(), pretetitumStart.indexOf("</span>")).trim();
+				res.put(NounFormEnum.OBESTAMD_FORM_PLURAL,LanguageWord.newInstance(payload, LanguageCode.SV));
 			}
 		}
 
@@ -561,5 +605,11 @@ public interface RelatedForms {
 
 
 	public boolean containsForm(LanguageWord lw);
+
+
+	public Set<LanguageWord> getRelatedWords();
+
+
+	public LanguageWord getGrundform();
 
 }
