@@ -8,7 +8,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -16,9 +15,11 @@ import java.util.stream.Collectors;
 
 import cachingutils.PlainObjectFileBasedCache;
 import discordforrad.LanguageCode;
+import discordforrad.Main;
 import discordforrad.Translator;
 import discordforrad.inputUtils.WebScrapping;
 import discordforrad.inputUtils.WebScrapping.DataBaseEnum;
+import discordforrad.inputUtils.databases.BabLaProcessing;
 import discordforrad.models.language.WordDescription.WordType;
 import discordforrad.models.language.wordnetwork.forms.RelatedForms;
 import discordforrad.models.language.wordnetwork.forms.RelatedFormsNetwork;
@@ -26,7 +27,7 @@ import discordforrad.models.language.wordnetwork.forms.RelatedFormsTransition;
 import net.dv8tion.jda.api.entities.TextChannel;
 
 public class WordDescription implements Serializable {
-	private static final File cacheFile = Paths.get("data/cache/word_description_cache.obj").toFile();
+	private static final File cacheFile = Paths.get(Main.ROOT_DATABASE+"caches/word_description_cache.obj").toFile();
 	static final PlainObjectFileBasedCache<Map<LanguageWord, WordDescription>> cache = PlainObjectFileBasedCache.loadFromFile(cacheFile, ()->new HashMap<>());
 	public static enum WordType{UNDEFINED, ADV, VTR, N, S,UTTR, PREP, ADJ, V_EXPR,VI,VITR, VITR_PART, RAKN, PRON,
 		N_PL,EXPR, INTERJ, CONJ, VBAL_UTTR, VTR_PHRASAL_SEP, VTR_PHRASAL_INSEP, VTR_PARTIKEL_OSKJ, V_PRES,
@@ -185,7 +186,7 @@ public class WordDescription implements Serializable {
 		}
 
 		public static List<String> getBabLaDefinitionsFrom(LanguageWord lw, String babLaInput) {			
-			List<String> res = getBabLaDirectDefinitionsFrom(lw,babLaInput);
+			List<String> res = BabLaProcessing.getBabLaDirectDefinitionsFrom(lw,babLaInput);
 			
 			List<String> translationsAndExamples = getBabLaDefinitionsFromTranslationsAndExamples(lw,babLaInput);
 			
@@ -229,42 +230,6 @@ public class WordDescription implements Serializable {
 			allLines = allLines.stream().map(x->x.substring(0,x.indexOf("<"))).collect(Collectors.toList());
 			
 			return allLines;*/
-		}
-
-		private static List<String> getBabLaDirectDefinitionsFrom(LanguageWord lw, String babLaInput) {
-			String languageToTranslateTo = null;
-			if(lw.getCode().equals(LanguageCode.EN)) languageToTranslateTo = "Swedish";
-			else if(lw.getCode().equals(LanguageCode.SV)) languageToTranslateTo = "English";
-			
-			String startDelimitor = ("<h2 class=\"h1\">\""
-					+lw.getWord()+"\" in "+languageToTranslateTo).toLowerCase();
-			
-			int startDelimitation = babLaInput.toLowerCase().indexOf(startDelimitor);
-			if(startDelimitation==-1)return new ArrayList<>();
-			String inputForDefinitions =  babLaInput
-					.substring(startDelimitation+startDelimitor.length());
-			inputForDefinitions = inputForDefinitions.substring(0,inputForDefinitions.indexOf("<h2"));
-			
-			List<String> allRelevantTranslations = Arrays.asList(inputForDefinitions.split("class=\"babQuickResult\">"))
-					.stream()
-					.filter(x->x.toLowerCase().startsWith(lw.getWord().toLowerCase()+"<"))
-					.collect(Collectors.toList());
-			
-			List<String> allItems = 
-					allRelevantTranslations.stream().map(x->Arrays.asList(x.split("<li>")))
-					.reduce(new ArrayList<>(), (x,y)->{x.addAll(y); return x;});
-			
-			if(allItems.size()==0)
-				return new LinkedList<>();
-			allItems = allItems.subList(1, allItems.size());
-			String firstItem = allItems.get(0);
-			allItems = allItems.stream()
-					.map(x->x.substring(0, x.indexOf("</a>")))
-					.map(x->x.substring(x.lastIndexOf(">")+1,x.length()))
-					.collect(Collectors.toList());
-			if(allItems.contains("Translations & Examples"))
-				allItems=allItems.subList(0, allItems.indexOf("Translations & Examples"));
-			return allItems;
 		}
 
 		private static Set<StringPair> getBabLaContextSentencesFrom(

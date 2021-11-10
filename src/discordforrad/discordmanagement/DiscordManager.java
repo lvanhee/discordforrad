@@ -4,14 +4,20 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
+
+import javax.security.auth.login.LoginException;
 
 import com.sedmelluq.discord.lavaplayer.container.mp3.Mp3AudioTrack;
 import com.sedmelluq.discord.lavaplayer.player.AudioLoadResultHandler;
@@ -44,24 +50,43 @@ import discordforrad.models.language.WordDescription;
 import discordforrad.models.language.WordDescription.WordType;
 import discordforrad.models.learning.focus.ReadThroughFocus;
 import net.dv8tion.jda.api.entities.Message.Attachment;
+import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.OnlineStatus;
 import net.dv8tion.jda.api.entities.TextChannel;
 import net.dv8tion.jda.api.entities.VoiceChannel;
 import net.dv8tion.jda.api.events.message.guild.GuildMessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.managers.AudioManager;
 
-public class OrdforrAIListener extends ListenerAdapter {
+public class DiscordManager extends ListenerAdapter {
 
-
+	
+	public static JDA jda=null;
 	public static TextChannel discussionChannel = null;
 	//private static final AudioPlayer player;
 	static {
-		OrdforrAIListener.discussionChannel = 
+		String token;
+		try {
+		//	System.setProperty("java.library.path", "C:/Users/loisv/Downloads/mpg123-1.28.0-x86-64/mpg123-1.28.0-x86-64/libmpg123-0.dll");
+			token = Files.readString(Paths.get(Main.ROOT_DATABASE+"auth/discord_token.txt"));
+			jda = JDABuilder.createLight(token).build();
+			jda.getPresence().setStatus(OnlineStatus.ONLINE);
+			jda.awaitReady();
+		} catch (IOException e) {
+			e.printStackTrace();
+		} catch (LoginException e) {
+			e.printStackTrace();
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+		
+		DiscordManager.discussionChannel = 
 				//jda.getCategories().get(0).getChannels().get(0);
-				Main.jda.getTextChannelsByName("main", true).get(0);
-		OrdforrAIListener.discussionChannel.sendMessage("AI ready").queue();
+				jda.getTextChannelsByName("main", true).get(0);
+		DiscordManager.discussionChannel.sendMessage("AI ready").queue();
 
-		VoiceChannel channel = Main.jda.getVoiceChannelByName("audio", false).iterator().next();
+		VoiceChannel channel = jda.getVoiceChannelByName("audio", false).iterator().next();
 
 		AudioPlayerManager playerManager = new DefaultAudioPlayerManager();
 		AudioSourceManagers.registerRemoteSources(playerManager);
@@ -75,7 +100,7 @@ public class OrdforrAIListener extends ListenerAdapter {
 		//	player = playerManager.createPlayer();
 
 
-		AudioManager manager = Main.jda.getGuilds().get(0).getAudioManager();
+		AudioManager manager = jda.getGuilds().get(0).getAudioManager();
 		// MySendHandler should be your AudioSendHandler implementation
 		//manager.setSendingHandler(new MySendHandler(player));
 
@@ -87,25 +112,27 @@ public class OrdforrAIListener extends ListenerAdapter {
 		//	player.playTrack(at);
 		//	player.startTrack(at, true);
 
-		/*playerManager.loadItem("C:\\Users\\loisv\\Downloads\\binary.mp3", 
-				new FunctionalResultHandler(track -> player.playTrack(track),
-                        null, null, null));*/
 
 		System.out.println("end");
 
 		PlayerManager.getInstance()
-		.loadAndPlay(OrdforrAIListener.discussionChannel, 
+		.loadAndPlay(DiscordManager.discussionChannel, 
 				//"data/cache/mp3/ENaccommodation.mp3"
 				"https://www.youtube.com/watch?v=JiF3pbvR5G0"
 				);
-
+		
 	}
 
-	public void onGuildMessageReceived(GuildMessageReceivedEvent event) {		
+	public void onGuildMessageReceived(GuildMessageReceivedEvent event) {
+		Thread.currentThread().setName("ProcessingIncomingDiscordMessage");
 		if (event.getMessage().getContentRaw().equals("y")) {
 			DisOrdforrAI.INSTANCE.confirm(false);
 		}else if (event.getMessage().getContentRaw().equals("Y")) {
 			DisOrdforrAI.INSTANCE.confirm(true);
+		}
+		else if (event.getMessage().getContentRaw().equals("F")) {
+			DisOrdforrAI.INSTANCE.forbidLastWord();
+			DisOrdforrAI.INSTANCE.askForNextWord();
 		}
 		else if (event.getMessage().getContentRaw().equals("/new-session")) {
 			DisOrdforrAI.INSTANCE.startNewSession();
@@ -177,11 +204,12 @@ public class OrdforrAIListener extends ListenerAdapter {
 		}
 	}
 
-	public static void printWithEmphasisOnWords(LanguageText lt, VocabularyLearningStatus vls) {
+	public static void printWithEmphasisOnWords(LanguageText lt, 
+			VocabularyLearningStatus vls) {
 
 		String raw = lt.getText();
 		LanguageCode languageCode = lt.getLanguageCode();
-		String res = "";
+		List<FontedText> res = new LinkedList<>();
 		int current = 0;
 		String currentString="";
 		boolean isParsingWord = false;
@@ -195,45 +223,35 @@ public class OrdforrAIListener extends ListenerAdapter {
 				if(!currentString.isEmpty())
 				{
 					LanguageWord lw = LanguageWord.newInstance(currentString, languageCode);
-					if(vls.isLongTermWord(lw)||!Dictionnary.isInDictionnaries(lw))
-						res+="***"+currentString+"***";
+					if(vls.isLongTermWord(lw)||!Dictionnary.isInDictionnaries(lw)||vls.isForbiddenWord(lw))
+						res.add(FontedText.newInstance(currentString, DiscordFont.BOLD_ITALICS_VISIBLE));
 					else if(vls.isEarlyPhaseWord(lw))
-						res+="*"+currentString+"*";
+						res.add(FontedText.newInstance(currentString, DiscordFont.ITALICS));
 					else if(vls.isMidTermWord(lw))
-						res+="**"+currentString+"**";
+						res.add(FontedText.newInstance(currentString, DiscordFont.BOLD));
+					else 
+						throw new Error();
 					currentString="";
 				}
-				res+= raw.charAt(i);
+				res.add(FontedText.newInstance(currentChar+"", DiscordFont.NO_FONT));
 			}	
 		}
 
 		if(!currentString.isEmpty())
 		{
-			if(vls.isEarlyPhaseWord(LanguageWord.newInstance(currentString, languageCode)))
-				res+="*"+currentString+"*";
-			else if(vls.isMidTermWord(LanguageWord.newInstance(currentString, languageCode)))
-				res+="**"+currentString+"**";
-			else if(vls.isLongTermWord(LanguageWord.newInstance(currentString, languageCode)))
-				res+="***"+currentString+"***";
+			LanguageWord currentWord = LanguageWord.newInstance(currentString, languageCode);
+			if(vls.isLongTermWord(currentWord)||
+					!Dictionnary.isInDictionnaries(currentWord)||
+					vls.isForbiddenWord(currentWord))
+				res.add(FontedText.newInstance(currentString, DiscordFont.BOLD_ITALICS_VISIBLE));
+			if(vls.isEarlyPhaseWord(currentWord))
+				res.add(FontedText.newInstance(currentString, DiscordFont.ITALICS));
+			else if(vls.isMidTermWord(currentWord))
+				res.add(FontedText.newInstance(currentString, DiscordFont.BOLD));
+			
 		}
-
-		while(res.length()>1000)
-		{
-			String toPrint = res.substring(0, 1000);
-			res = res.substring(1000);
-			int indexSplit = res.indexOf(".")+1;
-			toPrint+=res.substring(0,indexSplit);
-			res = res.substring(indexSplit);
-			OrdforrAIListener.print(toPrint);
-		}
-		try {
-			if(!res.isEmpty())
-				OrdforrAIListener.print(res);
-		}
-		catch(IllegalStateException e)
-		{
-			throw new Error();
-		}
+		
+		print(DiscordFontedString.newInstance(res));
 	}
 
 	public static void print(WordDescription description) {
@@ -291,18 +309,34 @@ public class OrdforrAIListener extends ListenerAdapter {
 		return toPrint;
 	}
 
-	public static void print(String toPrint) {
+	public static void print(DiscordFontedString toPrint) {		
 		if(toPrint.isBlank())return;
-		while(toPrint.length()>2000)
+				
+		for(DiscordFontedString dfs: toPrint.splitInRawString(2000))
 		{
-			OrdforrAIListener.discussionChannel.sendMessage(toPrint.substring(0, 2000)).queue();
-			toPrint = toPrint.substring(2000);
+			
+			DiscordManager.discussionChannel.sendMessage(dfs.toRawDiscordText()).queue();
 		}
-			OrdforrAIListener.discussionChannel.sendMessage(toPrint).queue();
+	}
+
+	private static String compressedFormattedString(String toPrint) {
+		for(String formatFreeString: Arrays.asList(" ","\n","\n\n"))
+		{
+			toPrint = toPrint.replaceAll("\\*\\*\\*"+formatFreeString+"\\*\\*\\*", formatFreeString);
+			toPrint = toPrint.replaceAll("\\*\\*"+formatFreeString+"\\*\\*", formatFreeString);
+			toPrint = toPrint.replaceAll("\\*"+formatFreeString+"\\*", formatFreeString);
+		}
+		
+		return toPrint;
+		
 	}
 
 	public static void playSoundFor(LanguageWord currentWordToAsk) {
 		//throw new Error();
+	}
+
+	public static void print(String toPrint) {
+		print(DiscordFontedString.newInstance(toPrint));
 	}
 
 }

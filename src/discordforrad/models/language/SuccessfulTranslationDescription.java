@@ -6,7 +6,6 @@ import java.util.Set;
 
 import discordforrad.LanguageCode;
 import discordforrad.Translator;
-import discordforrad.models.language.SuccessfulTranslationDescription.Origin;
 import discordforrad.models.language.WordDescription.WordType;
 
 public class SuccessfulTranslationDescription implements TranslationDescription, Serializable{
@@ -76,6 +75,9 @@ public class SuccessfulTranslationDescription implements TranslationDescription,
 		return translations;
 		
 		
+	}
+	public Origin getOrigin() {
+		return translationOrigins;
 	}
 
 }

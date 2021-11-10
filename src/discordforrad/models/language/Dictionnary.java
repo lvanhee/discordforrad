@@ -25,6 +25,7 @@ import java.util.stream.Collectors;
 
 import cachingutils.PlainObjectFileBasedCache;
 import discordforrad.LanguageCode;
+import discordforrad.Main;
 import discordforrad.Translator;
 import discordforrad.inputUtils.TextInputUtils;
 import discordforrad.inputUtils.WebScrapping;
@@ -36,13 +37,13 @@ import webscrapping.RobotBasedPageReader;
 import webscrapping.WebpageReader;
 
 public class Dictionnary {
-
-	private static final File DATABASE_VALID = Paths.get("data/cache/words_in_dictionnary.obj").toFile();
+	
+	private static final File DATABASE_VALID = Paths.get(Main.ROOT_DATABASE+"caches/words_in_dictionnary.obj").toFile();
 	private static final PlainObjectFileBasedCache<Set<LanguageWord>> validWordCache = PlainObjectFileBasedCache.loadFromFile(DATABASE_VALID, ()->new HashSet<>());
 	private static final Set<LanguageWord> invalidWordCache = new HashSet<>();
 
-	private static final File DATABASE_INVALID = Paths.get("data/cache/invalid_words.obj").toFile();
-	private static final File DATABASE_ENGLISH = Paths.get("data/english_words.txt").toFile();
+	private static final File DATABASE_INVALID = Paths.get(Main.ROOT_DATABASE+"invalid_words.obj").toFile();
+	private static final File DATABASE_ENGLISH = Paths.get(Main.ROOT_DATABASE+"english_words.txt").toFile();
 	private static final Set<String> ENGLISH_DICTIONNARY=new HashSet<>();
 	
 	static {
@@ -165,7 +166,8 @@ public class Dictionnary {
 	{
 		String current = "";
 		String prev = "prev";
-		PlainObjectFileBasedCache<Set<String>> allKnownWords = PlainObjectFileBasedCache.loadFromFile(new File("data/cache/dictionnary_from_saol.obj"), ()->new HashSet<>());
+		PlainObjectFileBasedCache<Set<String>> allKnownWords = PlainObjectFileBasedCache.loadFromFile(new File(
+				Main.ROOT_DATABASE+"caches/dictionnary_from_saol.obj"), ()->new HashSet<>());
 		Robot r = new Robot();
 
 		/*RobotBasedPageReader.clickOn(200, 200);
@@ -202,9 +204,11 @@ public class Dictionnary {
 		do {
 			nextIteration.clear();
 			
+			
 			List<String> shuffledWords = //new LinkedList<>();
 					allKnownWords.get()
-					.stream()
+					.parallelStream()
+					.filter(x->!x.startsWith("-"))
 					.filter(x->Dictionnary.isInDictionnariesWithCrosscheck(LanguageWord.newInstance(x, LanguageCode.SV)))
 					.collect(Collectors.toList());
 			shuffledWords.addAll(VocabularyLearningStatus.loadFromFile().getAllWords().stream()

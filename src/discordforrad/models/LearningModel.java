@@ -19,10 +19,14 @@ public class LearningModel {
 				vls.getAllWords().stream().anyMatch(x->isTimeForLearning(x,vls));
 	}
 	public static boolean isTimeForLearning(LanguageWord s,VocabularyLearningStatus vls) {
+		if(s.getWord().equals("anställd"))
+			System.out.print("");
 		TemporalAmount durationToWaitBeforeNextIncrement = getTimeBetweenIncrementsForLearning(vls.getNumberOfSuccessLearning(s));
 		LocalDateTime timeLastSuccess = vls.getLastSuccessOf(s);
 		LocalDateTime timeNextAttemps = timeLastSuccess.plus(durationToWaitBeforeNextIncrement);
-		return timeNextAttemps.isBefore(LocalDateTime.now());
+		LocalDateTime now = LocalDateTime.now();
+		boolean result = timeNextAttemps.isBefore(now);
+		return result;
 		
 	}
 

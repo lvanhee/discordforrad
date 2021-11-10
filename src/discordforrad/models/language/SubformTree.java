@@ -26,11 +26,14 @@ public class SubformTree implements Serializable {
 	}
 
 	private static Set<LanguageWord> getSubwords(LanguageWord lw) {
+		if(lw.getWord().equals("underordnade"))
+			System.out.print("");
 		String whole = lw.getWord();
 		Set<LanguageWord> subwords = new HashSet<>();
 		while(whole.length()>3)
 		{
-			whole = whole.substring(1);
+			whole = whole.substring(1).trim();
+			if(whole.startsWith("-")) whole = whole.substring(1);
 			if(Dictionnary.isInDictionnaries(LanguageWord.newInstance(whole, lw.getCode())))
 				subwords.add(LanguageWord.newInstance(whole, lw.getCode()));
 		}
@@ -38,7 +41,7 @@ public class SubformTree implements Serializable {
 		whole = lw.getWord();
 		while(whole.length()>3)
 		{
-			whole = whole.substring(0, whole.length()-1);
+			whole = whole.substring(0, whole.length()-1).trim();
 			if(Dictionnary.isInDictionnaries(LanguageWord.newInstance(whole, lw.getCode())))
 				subwords.add(LanguageWord.newInstance(whole, lw.getCode()));
 		}

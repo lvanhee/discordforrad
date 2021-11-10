@@ -12,10 +12,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import discordforrad.Main;
+
 
 public class UserLearningTextManager {
 	
-	private static final Path LOCATION_RAW_LEARNING_TEXT = Paths.get("data/raw_text_database.txt");
+	private static final Path LOCATION_RAW_LEARNING_TEXT = Paths.get(Main.ROOT_DATABASE+"raw_text_database.txt");
 	
 	private static final Map<String, String> indexedEntries = new HashMap<String, String>();
 	static
@@ -75,7 +77,7 @@ public class UserLearningTextManager {
 	}
 
 
-	public static Map<String, Integer> getAllOccurrencesOfEveryWord() {
+	public static Map<String, Integer> getAllOccurrencesOfEveryWordEverIncludedInUserText() {
 		try {
 			String fulltext = Files.readString(LOCATION_RAW_LEARNING_TEXT,Charset.forName("ISO-8859-1"));
 			List<String> allWords = TextInputUtils.toListOfWords(fulltext);

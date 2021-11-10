@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import discordforrad.LanguageCode;
+import discordforrad.Main;
 import discordforrad.inputUtils.UserLearningTextManager;
 import discordforrad.inputUtils.TextInputUtils;
 import discordforrad.models.language.LanguageText;
@@ -21,7 +22,7 @@ import discordforrad.models.language.LanguageWord;
 
 public class ReadThroughFocus {
 	
-	private static final Path FOCUS_PATH = Paths.get("data/focus/current_focus.txt");  
+	private static final Path FOCUS_PATH = Paths.get(Main.ROOT_DATABASE+"focus/current_focus.txt");  
 	
 	private final List<LanguageText> texts;
 	private final Map<LanguageText, String> indexes;
@@ -61,7 +62,9 @@ public class ReadThroughFocus {
 	}
 
 	public List<LanguageWord> getAllValidWordsSortedByTheirOrderOfOccurrenceInFocusTexts() {
-		return texts.stream().map(x->x.getListOfValidWords()).reduce(new ArrayList<LanguageWord>(), (x,y)->{x.addAll(y); return x;});
+		return texts.stream()
+				.map(x->x.getListOfValidWords())
+				.reduce(new ArrayList<LanguageWord>(), (x,y)->{x.addAll(y); return x;});
 	}
 
 	public static ReadThroughFocus newInstance(String string, LanguageCode lc) {

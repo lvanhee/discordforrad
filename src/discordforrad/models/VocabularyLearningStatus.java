@@ -19,8 +19,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
+import cachingutils.Cache;
+import cachingutils.FileBasedStringSetCache;
 import discordforrad.AddStringResultContext;
 import discordforrad.LanguageCode;
+import discordforrad.Main;
 import discordforrad.Translator;
 import discordforrad.inputUtils.TextInputUtils;
 import discordforrad.models.language.Dictionnary;
@@ -30,7 +33,9 @@ import discordforrad.models.language.SuccessfulTranslationDescription;
 import discordforrad.models.language.TranslationDescription;
 
 public class VocabularyLearningStatus {
-	private static final Path FILEPATH = Paths.get("data/learned_words.txt");
+	private static final Path FILEPATH = Paths.get(Main.ROOT_DATABASE+"learned_words.txt");
+	private static final Path FORBIDDEN_FILEPATH = Paths.get(Main.ROOT_DATABASE+"disregarded_words.txt");
+	
 	private static final int MAX_LEARNED = 10;
 	private static final int SHORT_TERM_NUMBER_OF_REPEAT = 2;
 	private static final int MID_TERM_NUMBER_OF_REPEAT = 7;
@@ -38,6 +43,12 @@ public class VocabularyLearningStatus {
 	private static final int DEFAULT_LONG_TERM_WORDS_TO_LEARN_EVERY_SESSION = 10;
 	private final Map<LanguageWord, Integer> successfulLearningPerWord;
 	private final Map<LanguageWord, LocalDateTime> timeLastAttempt;
+	
+	//These words correspond to oddities that are not worth being learned about
+	private final Set<LanguageWord> forbiddenWords = 
+			FileBasedStringSetCache.loadCache(FORBIDDEN_FILEPATH,
+			LanguageWord::parse,
+			x->x.toString());
 
 	public enum LearningStatus {IN_ACQUISITION, IN_CONSOLIDATION, LEARNED}
 
@@ -46,14 +57,21 @@ public class VocabularyLearningStatus {
 			Map<LanguageWord, Integer> m, 
 			Map<LanguageWord, LocalDateTime> m2)
 	{
-		Set<LanguageWord>toRemove =
-				m.keySet().parallelStream().sorted((x,y)->x.toString().compareTo(y.toString()))
-				.filter(lw->!Dictionnary.isInDictionnariesWithCrosscheck(lw)).collect(Collectors.toSet());
-
-		for(LanguageWord lw:toRemove)
-			m.remove(lw);
+		//assert(isAllWordsInInputCorrect(m));
+		
 		this.successfulLearningPerWord = m;
 		this.timeLastAttempt = m2;
+		
+		updateFile();
+	}
+
+
+	private boolean isAllWordsInInputCorrect(Map<LanguageWord, Integer> m) {
+		Set<LanguageWord>toRemove =
+		m.keySet().parallelStream().sorted((x,y)->x.toString().compareTo(y.toString()))
+		.filter(lw->!Dictionnary.isInDictionnariesWithCrosscheck(lw)).collect(Collectors.toSet());
+		toRemove.addAll(forbiddenWords);
+		return toRemove.stream().anyMatch(x->m.containsKey(x));
 	}
 
 
@@ -91,8 +109,7 @@ public class VocabularyLearningStatus {
 		}
 
 		c.addResult(lw);
-		successfulLearningPerWord.put(lw, 0);
-		timeLastAttempt.put(lw, LocalDateTime.MIN);
+		addNewWordInDatabase(lw);
 
 		if(recursivityDepth>0)
 		{
@@ -109,6 +126,14 @@ public class VocabularyLearningStatus {
 						((SuccessfulTranslationDescription)translation).getTranslatedText().getText(),
 						c, false,recursivityDepth-1);
 		}
+	}
+
+
+	private void addNewWordInDatabase(LanguageWord lw) {
+		if(forbiddenWords.contains(lw))return;
+		
+		successfulLearningPerWord.put(lw, 0);
+		timeLastAttempt.put(lw, LocalDateTime.MIN);
 	}
 
 
@@ -144,16 +169,6 @@ public class VocabularyLearningStatus {
 	}*/
 
 
-
-
-
-
-	/*public double vocabularyKnownRatio() {
-		return (double)successfulLearningPerWordEN.values().parallelStream().filter(x->x>MAX_LEARNED)
-				.count()/successfulLearningPerWordEN.size();
-	}*/
-
-
 	public Set<LanguageWord> getAllWords() {
 		return successfulLearningPerWord.keySet();
 	}
@@ -173,6 +188,10 @@ public class VocabularyLearningStatus {
 
 
 	public void incrementSuccess(LanguageWord lastWordAsked) {
+		if(!Dictionnary.isInDictionnaries(lastWordAsked))
+			throw new Error();
+		if(forbiddenWords.contains(lastWordAsked))
+			throw new Error();
 		timeLastAttempt.put(lastWordAsked, LocalDateTime.now());
 		if(!successfulLearningPerWord.containsKey(lastWordAsked))successfulLearningPerWord.put(lastWordAsked, 0);
 		successfulLearningPerWord.put(lastWordAsked,successfulLearningPerWord.get(lastWordAsked)+1);
@@ -180,7 +199,16 @@ public class VocabularyLearningStatus {
 	}
 
 
+	private boolean contains(LanguageWord lw) {
+		return successfulLearningPerWord.containsKey(lw);
+	}
+
+
 	public void decrementSuccessUpToZero(LanguageWord lastWordAsked) throws IOException {
+		if(!Dictionnary.isInDictionnaries(lastWordAsked))
+			throw new Error();
+		if(forbiddenWords.contains(lastWordAsked))
+			throw new Error();
 		timeLastAttempt.put(lastWordAsked, LocalDateTime.now());
 		if(!successfulLearningPerWord.containsKey(lastWordAsked))
 			successfulLearningPerWord.put(lastWordAsked, 0);
@@ -191,9 +219,11 @@ public class VocabularyLearningStatus {
 	}
 
 
-	public Set<LanguageWord> getAllShortTermWords() {
-		return successfulLearningPerWord.keySet().stream().filter(x->
-		isEarlyPhaseWord(x)).collect(Collectors.toSet());
+	public Set<LanguageWord> getAllValidShortTermWords() {
+		return successfulLearningPerWord.keySet().stream()
+				.filter(x->isEarlyPhaseWord(x))
+				.filter(x->!isForbiddenWord(x))
+				.collect(Collectors.toSet());
 	}
 
 
@@ -205,7 +235,9 @@ public class VocabularyLearningStatus {
 
 	public Set<LanguageWord> getAllLongTermWords() {
 		Set<LanguageWord> res = successfulLearningPerWord.keySet().stream()
-				.filter(x->isLongTermWord(x)).collect(Collectors.toSet()); 
+				.filter(x->isLongTermWord(x))
+				.filter(x->!isForbiddenWord(x))
+				.collect(Collectors.toSet()); 
 		return res;
 	}
 
@@ -231,8 +263,8 @@ public class VocabularyLearningStatus {
 	}
 
 
-	public boolean isReadyToBeExposedAgain(LanguageWord s) {
-		return LearningModel.isTimeForLearning(s, this);
+	public boolean isExposableForLearning(LanguageWord s) {
+		return LearningModel.isTimeForLearning(s, this) &&!isForbiddenWord(s)&&Dictionnary.isInDictionnaries(s);
 	}
 
 
@@ -329,8 +361,21 @@ public class VocabularyLearningStatus {
 	}
 
 
+	public void forbidWord(LanguageWord lw) {
+		forbiddenWords.add(lw);
+		successfulLearningPerWord.remove(lw);
+		timeLastAttempt.remove(lw);
+	}
 
 
+	public boolean isForbiddenWord(LanguageWord lw) {
+		return forbiddenWords.contains(lw);
+	}
+
+
+	public Set<LanguageWord> getAllExposableShortTermWords() {
+		return getAllValidShortTermWords().stream().filter(x->isExposableForLearning(x)).collect(Collectors.toSet());
+	}
 
 
 

@@ -14,9 +14,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import cachingutils.PlainObjectFileBasedCache;
+import discordforrad.Main;
 import discordforrad.inputUtils.DatabaseProcessingOutcome;
 import discordforrad.inputUtils.EntriesFoundWebscrappingOutcome;
 import discordforrad.inputUtils.WebScrapping;
@@ -26,7 +28,7 @@ import discordforrad.models.language.WordDescription.WordType;
 
 public class RelatedFormsNetwork {
 	
-	private static final String PATH_TO_KNOWN_RELATED_NETWORK_TRANSITION_CACHE = "data/cache/related_forms_network.obj";
+	private static final String PATH_TO_KNOWN_RELATED_NETWORK_TRANSITION_CACHE = Main.ROOT_DATABASE+"caches/related_forms_network.obj";
 	private static final PlainObjectFileBasedCache<Map<LanguageWord, RelatedFormsTransition>> knownTransitionsPerWord =
 			PlainObjectFileBasedCache.loadFromFile(new File(PATH_TO_KNOWN_RELATED_NETWORK_TRANSITION_CACHE), 
 					()->new HashMap<>());
@@ -134,7 +136,7 @@ public class RelatedFormsNetwork {
 		return res;
 	}
 
-
+	
 
 	private static RelatedFormsTransition getRelatedFormsSo(LanguageWord lw) {
 		DatabaseProcessingOutcome outcome = WebScrapping.getContentsFrom(lw, DataBaseEnum.SO);

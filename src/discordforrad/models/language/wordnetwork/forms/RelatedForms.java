@@ -261,7 +261,8 @@ public interface RelatedForms {
 			if(wholeForm.contains("<span class=\"orto\">"))
 			{
 				String infinitivStart = wholeForm.substring(wholeForm.indexOf("<span class=\"orto\">"));
-				String infinitivEnd = infinitivStart.substring(new String("<span class=\"orto\">").length(), infinitivStart.indexOf("</span>"));
+				String infinitivEnd = infinitivStart.substring(new String("<span class=\"orto\">").length(), infinitivStart.indexOf("</span>")).trim();
+				if(infinitivEnd.startsWith("-"))infinitivEnd = infinitivEnd.substring(1);
 				enn = LanguageWord.newInstance(infinitivEnd.trim(), LanguageCode.SV);
 			}
 
@@ -322,6 +323,7 @@ public interface RelatedForms {
 				{
 					String startEnn = bit.substring(bit.indexOf(startingPattern)+startingPattern.length());
 					startEnn= startEnn.substring(0,startEnn.indexOf("</span>")).trim();
+					if(startEnn.startsWith("-"))startEnn = startEnn.substring(1);
 					enn = LanguageWord.newInstance(startEnn, LanguageCode.SV);
 					continue;
 				}
@@ -329,13 +331,15 @@ public interface RelatedForms {
 				{
 					String startEtt = bit.substring(bit.indexOf(startingPattern)+startingPattern.length());
 					startEtt= startEtt.substring(0,startEtt.indexOf("</span>")).trim();
+					if(startEtt.startsWith("-"))startEtt = startEtt.substring(1);
 					ett = LanguageWord.newInstance(startEtt, LanguageCode.SV);
 					continue;
 				}
 				if(header.equals("den/det/de")||header.equals("de"))
 				{
 					String startPlural = bit.substring(bit.indexOf(startingPattern)+startingPattern.length());
-					String payload = startPlural.substring(0,startPlural.indexOf("</span>")).trim(); 
+					String payload = startPlural.substring(0,startPlural.indexOf("</span>")).trim();
+					if(payload.startsWith("-"))payload = payload.substring(1);
 					if(mode==DEFAULT)plural = LanguageWord.newInstance(payload, LanguageCode.SV);
 					else if(mode==SUPERLATIV)superlativDefined = LanguageWord.newInstance(payload, LanguageCode.SV);
 					else if(mode==KOMPARATIV)komparativDefined = LanguageWord.newInstance(payload, LanguageCode.SV);
@@ -347,6 +351,7 @@ public interface RelatedForms {
 				{
 					String startDefinite = bit.substring(bit.indexOf(startingPattern)+startingPattern.length());
 					startDefinite= startDefinite.substring(0,startDefinite.indexOf("</span>")).trim();
+					if(startDefinite.startsWith("-")) startDefinite = startDefinite.substring(1);
 					defined = LanguageWord.newInstance(startDefinite, LanguageCode.SV);
 					continue;
 				}
@@ -364,6 +369,7 @@ public interface RelatedForms {
 				{
 					String startKomparativ = bit.substring(bit.indexOf(startingPattern)+startingPattern.length());
 					startKomparativ= startKomparativ.substring(0,startKomparativ.indexOf("</span>")).trim();
+					if(startKomparativ.startsWith("-"))startKomparativ = startKomparativ.substring(1);
 					komparativ = LanguageWord.newInstance(startKomparativ, LanguageCode.SV);
 					continue;
 				}
@@ -372,6 +378,7 @@ public interface RelatedForms {
 				{
 					String startSuperlativ = bit.substring(bit.indexOf(startingPattern)+startingPattern.length());
 					startSuperlativ = startSuperlativ.substring(0,startSuperlativ.indexOf("</span>")).trim();
+					if(startSuperlativ.startsWith("-"))startSuperlativ = startSuperlativ.substring(1);
 					superlativ = LanguageWord.newInstance(startSuperlativ, LanguageCode.SV);
 					continue;
 				}
@@ -480,6 +487,8 @@ public interface RelatedForms {
 				if(!bit.contains(SAOL_PAYLOAD_INDICATOR))continue;
 				String payload = bit.substring(bit.indexOf(SAOL_PAYLOAD_INDICATOR)+SAOL_PAYLOAD_INDICATOR.length());
 				payload = payload.substring(0, payload.indexOf("<")).trim();
+				if(payload.startsWith("-"))
+					payload = payload.substring(1);
 				String typeRelation = bit.substring(bit.indexOf(SAOL_RELATION_INDICATOR)+ SAOL_RELATION_INDICATOR.length());
 				typeRelation = typeRelation.substring(0,typeRelation.indexOf("<")).trim();
 
@@ -573,6 +582,7 @@ public interface RelatedForms {
 			{
 				String infinitivStart = wholeForm.substring(wholeForm.indexOf("<span class=\"orto\">"));
 				String payload = infinitivStart.substring(new String("<span class=\"orto\">").length(), infinitivStart.indexOf("</span>")).trim();
+				if(payload.startsWith("-"))payload = payload.substring(1);
 				res.put(NounFormEnum.OBESTAMD_FORM_SINGULAR,LanguageWord.newInstance(payload, LanguageCode.SV));
 			}
 
@@ -580,6 +590,7 @@ public interface RelatedForms {
 			{
 				String pretetitumStart = wholeForm.substring(wholeForm.indexOf("<span class=\"bojning\">"));
 				String payload = pretetitumStart.substring(new String("<span class=\"bojning\">").length(), pretetitumStart.indexOf("</span>")).trim();
+				if(payload.startsWith("-"))payload = payload.substring(1);
 				res.put(NounFormEnum.BESTAMD_FORM_SINGULAR,LanguageWord.newInstance(payload, LanguageCode.SV));
 			}
 
@@ -588,6 +599,7 @@ public interface RelatedForms {
 			{
 				String pretetitumStart = wholeForm.substring(wholeForm.indexOf("<span class=\"bojning\">"));
 				String payload = pretetitumStart.substring(new String("<span class=\"bojning\">").length(), pretetitumStart.indexOf("</span>")).trim();
+				if(payload.startsWith("-")) payload = payload.substring(1);
 				res.put(NounFormEnum.OBESTAMD_FORM_PLURAL,LanguageWord.newInstance(payload, LanguageCode.SV));
 			}
 
@@ -596,6 +608,7 @@ public interface RelatedForms {
 			{
 				String pretetitumStart = wholeForm.substring(wholeForm.indexOf("<span class=\"bojning\">"));
 				String payload = pretetitumStart.substring(new String("<span class=\"bojning\">").length(), pretetitumStart.indexOf("</span>")).trim();
+				if(payload.startsWith("-")) payload = payload.substring(1);
 				res.put(NounFormEnum.OBESTAMD_FORM_PLURAL,LanguageWord.newInstance(payload, LanguageCode.SV));
 			}
 		}

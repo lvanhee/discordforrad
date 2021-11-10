@@ -12,11 +12,16 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.BiPredicate;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import cachingutils.SplittedFileBasedCache;
 import discordforrad.LanguageCode;
+import discordforrad.Main;
+import discordforrad.inputUtils.WebScrapping.DataBaseEnum;
+import discordforrad.inputUtils.databases.BabLaProcessing;
 import discordforrad.inputUtils.databases.WordReferenceDBManager;
 import discordforrad.models.language.LanguageWord;
 import discordforrad.models.language.wordnetwork.forms.SingleEntryWebScrapping;
@@ -25,11 +30,9 @@ import webscrapping.WebpageReader;
 
 public class WebScrapping {
 
-	public enum DataBaseEnum{
-		SAOL,SO,WORD_REFERENCE,BAB_LA
-	}
+	public enum DataBaseEnum{SAOL,SO,WORD_REFERENCE,BAB_LA}
 
-	private static final Path CACHE_FILEPATH = Paths.get("data/cache/");
+	private static final Path CACHE_FILEPATH = Paths.get("caches/");
 
 	private static final class DbLwPair
 	{
@@ -50,7 +53,7 @@ public class WebScrapping {
 	{
 		String cacheFolder = "\\"+db.name()+"\\";
 
-		String cacheFileName = CACHE_FILEPATH.toString()
+		String cacheFileName = Main.ROOT_DATABASE+CACHE_FILEPATH.toString()
 				+cacheFolder
 				+lw.toString().replaceAll(":", "")+".html";
 
@@ -81,7 +84,7 @@ public class WebScrapping {
 		if(cache.has(inputPair))
 		{
 			String content = cache.get(inputPair);
-			if(!isValidlyLoadedContents(db,content))
+			if(!isValidlyProcessedRequest(db,content,lw))
 			{
 				cache.delete(inputPair);
 				//	Files.delete(getCacheFileNameFor(db,lw).toPath());
@@ -89,7 +92,7 @@ public class WebScrapping {
 				return getContentsFrom(lw, db);
 				//		return SingleEntryWebScrapping.newInstance(content);
 			}
-			else return processToOutcomes(cache.get(inputPair),db);
+			else return processToOutcomes(cache.get(inputPair),x->WebScrapping.isValidlyProcessedRequest(db, x,lw));
 		}
 		
 		switch(db)
@@ -147,14 +150,19 @@ public class WebScrapping {
 							switch (db) {
 							case WORD_REFERENCE:case SO:case SAOL:
 								return startOfPageHtmlHeader+WebpageReader.getWebclientWebPageContents(x);
-							case BAB_LA: 	
+							case BAB_LA:
 								String r = null;
-								while(r==null||!r.contains("\n"))
+								boolean hasBeenTriedOnceAlready = false;
+								do
 								{
-									r = RobotBasedPageReader.getFullPageAsHtml(x);
-									if(r.length()<1000)
-										throw new Error("Error processing "+x);
+									if(hasBeenTriedOnceAlready)
+										BabLaProcessing.increaseProcessingTime();
+									else
+										BabLaProcessing.decreaseProcessingTime();
+									r = RobotBasedPageReader.getFullPageAsHtml(x,BabLaProcessing.getProcessingSpeedFactor());
+									
 								}
+								while(!BabLaProcessing.isValidlyProcessedRequest(r, lw));
 								return startOfPageHtmlHeader+r;
 							default:
 								throw new Error();
@@ -174,7 +182,7 @@ public class WebScrapping {
 						)*/
 				.reduce("", (x,y)->x+"\n"+y);
 
-		if(!isValidlyLoadedContents(db, entries))
+		if(!isValidlyProcessedRequest(db, entries,lw))
 		{
 			if(db.equals(DataBaseEnum.WORD_REFERENCE))
 			{
@@ -186,17 +194,17 @@ public class WebScrapping {
 		
 		cache.add(inputPair,entries);
 		 
-		return processToOutcomes(entries, db);
+		return processToOutcomes(entries, x->WebScrapping.isValidlyProcessedRequest(db, x,lw));
 	}
 
-	private static DatabaseProcessingOutcome processToOutcomes(String entry, DataBaseEnum db) {
+	private static DatabaseProcessingOutcome processToOutcomes(String entry, Predicate<String> checker) {
 		if(! entry.contains("<!--!!!START_OF_PAGE "))return SingleEntryWebScrapping.newInstance(entry);
 		List<String> entries = Arrays.asList(entry.split("<!--!!!START_OF_PAGE "));
 		
 		Set<String> res = entries
 				.stream()
 				.filter(x->!x.isBlank())
-				.filter(x->isValidlyLoadedContents(db, x))
+				.filter(checker)
 				.collect(Collectors.toSet());
 		
 		if(res.size()==0)
@@ -207,13 +215,13 @@ public class WebScrapping {
 		return  EntriesFoundWebscrappingOutcome.newInstance(res);
 	}
 
-	private static boolean isValidlyLoadedContents(DataBaseEnum db, String content) {
+	public static boolean isValidlyProcessedRequest(DataBaseEnum db, String content, LanguageWord lw) {
 		if(db.equals(DataBaseEnum.WORD_REFERENCE)
 				&&!WordReferenceDBManager.isContentOfSuccessfullyLoadedPage(content))
 			return false;
 		
-		if(db.equals(DataBaseEnum.BAB_LA)&& content.length()<1000)
-			return false;
+		if(db.equals(DataBaseEnum.BAB_LA))
+			return BabLaProcessing.isValidlyProcessedRequest(content,lw);
 		
 		if(content.equals("FAILED TO LOAD"))
 			return false;

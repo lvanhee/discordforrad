@@ -8,7 +8,7 @@ import java.util.HashMap;
 
 import javax.security.auth.login.LoginException;
 
-import discordforrad.discordmanagement.OrdforrAIListener;
+import discordforrad.discordmanagement.DiscordManager;
 import discordforrad.models.language.Dictionnary;
 import discordforrad.models.language.LanguageWord;
 import discordforrad.models.language.wordnetwork.WordNetwork;
@@ -21,31 +21,16 @@ import net.dv8tion.jda.api.OnlineStatus;
 
 public class Main {
 
-	public static JDA jda=null;
-	static {
-		String token;
-		try {
-		//	System.setProperty("java.library.path", "C:/Users/loisv/Downloads/mpg123-1.28.0-x86-64/mpg123-1.28.0-x86-64/libmpg123-0.dll");
-			token = Files.readString(Paths.get("data/auth/discord_token.txt"));
-			jda = JDABuilder.createLight(token).build();
-			jda.getPresence().setStatus(OnlineStatus.ONLINE);
-			jda.awaitReady();
-		} catch (IOException e) {
-			e.printStackTrace();
-		} catch (LoginException e) {
-			e.printStackTrace();
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
-
-	}
-
-
+	public static final String ROOT_DATABASE = "../databases/discordforrad/";
+	public static final boolean PRELOAD_PURGE_MODE = false;
 
 	// Main method
-	public static void main(String[] args) throws LoginException, IOException, InterruptedException {
-		/*new Thread(()->{
+	public static void main(String[] args) throws LoginException, IOException, InterruptedException
+	{
+		DisOrdforrAI.INSTANCE.startNewSession();
+		new Thread(()->{
 			try {
+				Thread.sleep(60000);
 				Dictionnary.main(args);
 			} catch (AWTException e) {
 				e.printStackTrace();
@@ -54,9 +39,7 @@ public class Main {
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
-		}).start();*/
-		DisOrdforrAI.INSTANCE.startNewSession();
-
-		jda.addEventListener(new OrdforrAIListener());
+		}).start();
+		DiscordManager.jda.addEventListener(new DiscordManager());
 	}
 }

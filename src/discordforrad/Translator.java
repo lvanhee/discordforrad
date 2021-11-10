@@ -43,7 +43,7 @@ public class Translator {
 	private static final String SWEDISH_CODE = "sv";
 	
 	
-	private static final File PATH_TO_GOOGLE_TRANSLATE_CACHE = new File("data/cache/google_translate_word_translation_cache.obj");
+	private static final File PATH_TO_GOOGLE_TRANSLATE_CACHE = new File(Main.ROOT_DATABASE+"caches/google_translate_word_translation_cache.obj");
 	
 	private static final PlainObjectFileBasedCache<Map<LanguageWord, LanguageText>> translatedWords=
 			PlainObjectFileBasedCache.loadFromFile(PATH_TO_GOOGLE_TRANSLATE_CACHE, ()->{return new HashMap<LanguageWord, LanguageText>();});
@@ -124,6 +124,8 @@ public class Translator {
 	}
 
 	public static Set<TranslationDescription> getAllTranslations(LanguageWord word, LanguageCode to) {
+		if(word.getWord().equals("ansågs"))
+			System.out.println();
 		TranslationDescription googleTranslation = getGoogleTranslation(word, to);
 		Set<TranslationDescription> babLaTranslations = BabLaProcessing.getBabLaTranslationDescriptions(word,to);
 		Set<TranslationDescription> wordReferenceTranslation = getWordReferenceTranslation(word,to);
@@ -213,6 +215,8 @@ public class Translator {
 								.replaceAll("\n", "")
 								.replaceAll("\r", "");
 						lastLeftTranslation = lastLeftTranslation.trim();
+						if(lastLeftTranslation.startsWith("-"))
+							lastLeftTranslation = lastLeftTranslation.substring(1);
 						while(lastLeftTranslation.contains("  "))
 							lastLeftTranslation=lastLeftTranslation.replaceAll("  ", " ");
 
@@ -297,6 +301,7 @@ public class Translator {
 						for(String localTranslation:rightTranslations)
 						{
 							localTranslation = localTranslation.replaceAll("!", "").trim();
+							while(localTranslation.startsWith("-")) localTranslation = localTranslation.substring(1);
 							if(lw.equals(LanguageWord.newInstance(localTranslation, languageCodeRightTable)))
 							{
 								res.add(SuccessfulTranslationDescription.newInstance(LanguageText.newInstance(languageCodeLeftTable,lastLeftTranslation), 
@@ -423,6 +428,39 @@ public class Translator {
 		if(! multiLine) translationText = translationText.replaceAll("  ", " ");
 		
 		return translationText;
+	}
+
+	public static Set<LanguageWord> getTranslationsOf(LanguageWord lw) {
+		Set<TranslationDescription> translations = 
+				Translator.getAllTranslations(lw, LanguageCode.otherLanguage(lw.getCode()));
+		Set<LanguageWord> alternatives = 
+				translations.stream()
+				.map(x->((SuccessfulTranslationDescription)x))
+				.map(x->x.getTranslatedText())
+				.filter(x->x.getListOfValidWords().size()==1)
+				.map(x->x.getListOfValidWords().get(0)).collect(Collectors.toSet());
+		return alternatives;
+	}
+
+	public static Set<LanguageWord> getTranslationsOfTranslations(LanguageWord lw) {
+		return getTranslationsOf(lw).stream().map(x->getTranslationsOf(x))
+		.reduce(new HashSet<>(), (x,y)->{x.addAll(y);return x;});
+	}
+
+	public static boolean hasTranslationOrAGrundformRelatedTranslationThatIsNotFromGoogle(LanguageWord x) {
+		Set<LanguageWord> allForms = new HashSet<>();
+		allForms.add(x);
+		allForms.addAll(WordDescription.getGrundforms(x));
+		
+		Set<TranslationDescription> translation = 
+				allForms.stream().map(y->Translator.getAllTranslations(y, LanguageCode.otherLanguage(y.getCode())))
+				.reduce(new HashSet<>(), (z,y)->{z.addAll(y); return z;});
+		
+		boolean res = translation.stream().filter(y->y instanceof SuccessfulTranslationDescription)
+				.map(y->(SuccessfulTranslationDescription)y)
+				.anyMatch(y->!y.getOrigin().equals(Origin.GOOGLE));
+							
+		return res;
 	}
 
 

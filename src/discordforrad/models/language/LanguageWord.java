@@ -15,6 +15,10 @@ public class LanguageWord implements Serializable{
 	{
 		if(word.contains("!"))
 			throw new Error();
+		if(!word.trim().equals(word))
+			throw new Error();
+		if(word.startsWith("-"))
+			throw new Error();
 		this.lc = lc;
 		this.word = word;
 	}
@@ -52,6 +56,13 @@ public class LanguageWord implements Serializable{
 		for(LanguageCode lc: LanguageCode.values())
 			res.addAll(strings.stream().map(x->LanguageWord.newInstance(x, lc)).collect(Collectors.toSet()));
 		return res;
+	}
+	
+	public static LanguageWord parse(String s)
+	{
+		String head = s.substring(0,s.indexOf(":"));
+		String end = s.substring(s.indexOf(":")+1);
+		return newInstance(end, LanguageCode.valueOf(head));
 	}
 
 }
