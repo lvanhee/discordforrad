@@ -22,13 +22,14 @@ public class DiscordFontedString {
 		for(FontedText ft:items)
 		{
 			if(ft.getText().isEmpty()) continue;
-			if(previousFont!=null && ft.getFont().equals(previousFont) ||
-					FontedText.isSensitiveToFonting(ft.getText()))
-				previousText+=ft.getText()+" ";
+			if(previousFont!=null && (ft.getFont().equals(previousFont) ||
+					FontedText.isBlendableWithPreviousFontedText(ft.getText())))
+				previousText+=ft.getText();
 			else
 			{
 				this.items.add(FontedText.newInstance(previousText,previousFont));
-				previousText = "";
+				previousText = ft.getText();
+				previousFont = ft.getFont();
 			}	
 		}
 		if(!items.isEmpty())
@@ -61,14 +62,16 @@ public class DiscordFontedString {
 	public String toRawDiscordText() {
 		if(items.isEmpty())return "";
 		String res = "";
-		DiscordFont previous = null;
+
 		for(FontedText f: items)
 		{
-			if(previous!=null && previous != DiscordFont.NO_FONT)
-				res+=" ";
-			previous = f.getFont();
 			
-			res+= DiscordFont.getDiscordStringSymbol(f.getFont())+f.getText()+DiscordFont.getDiscordStringSymbol(f.getFont());
+			String next =DiscordFont.getDiscordStringSymbol(f.getFont())+f.getText()+DiscordFont.getDiscordStringSymbol(f.getFont()); 
+			
+			if(next.endsWith(" *")) {next = next.substring(0,next.length()-2)+"* ";}//quickfix
+			if(res.endsWith("*")&&next.startsWith("*"))
+				next = " "+next;
+			res+= next;
 		}
 		return res;
 	}
@@ -81,23 +84,34 @@ public class DiscordFontedString {
 		if(this.toRawDiscordText().length()<numChar)return Arrays.asList(this);
 		
 		int crossedNumItems = 0;
-		List<FontedText> listOfItemsOnTheFirstSplitOfTheCurrentStringFromThePreviousIteration = new LinkedList<>();
+		List<FontedText> listOfItemsOnTheLeftThatWereNotCausingOverflowInThePreviousIteration = new LinkedList<>();
 		int indexCurrentList = 0;
 		for(FontedText ft: items)
 		{
 			List<FontedText> nextList = new ArrayList<>();
-			nextList.addAll(listOfItemsOnTheFirstSplitOfTheCurrentStringFromThePreviousIteration);
+			nextList.addAll(listOfItemsOnTheLeftThatWereNotCausingOverflowInThePreviousIteration);
 			nextList.add(ft);
 			DiscordFontedString dft = DiscordFontedString.newInstance(nextList);
 			if(dft.toRawDiscordText().length()>=numChar)
 			{
 				String textToAddThatLeadsToOverflow = ft.getText();
 				List<FontedText> lastNextListOnTheLeftSideOfTheSplit = new ArrayList<>();
-				lastNextListOnTheLeftSideOfTheSplit.addAll(listOfItemsOnTheFirstSplitOfTheCurrentStringFromThePreviousIteration);
+				lastNextListOnTheLeftSideOfTheSplit.addAll(listOfItemsOnTheLeftThatWereNotCausingOverflowInThePreviousIteration);
+				if(!lastNextListOnTheLeftSideOfTheSplit.isEmpty())
+				{
+					
+					
+					List<DiscordFontedString>res = new ArrayList<DiscordFontedString>();
+					DiscordFontedString left = DiscordFontedString.newInstance(listOfItemsOnTheLeftThatWereNotCausingOverflowInThePreviousIteration);
+					DiscordFontedString right = DiscordFontedString.newInstance(items.subList(listOfItemsOnTheLeftThatWereNotCausingOverflowInThePreviousIteration.size(), items.size()));
+					res.add(left);
+					res.addAll(right.splitInRawString(numChar));
+					return res;
+				}
 				for(int i = 1 ; i < textToAddThatLeadsToOverflow.length(); i++)
 				{
 					List<FontedText> nextList2 = new ArrayList<>();
-					nextList2.addAll(listOfItemsOnTheFirstSplitOfTheCurrentStringFromThePreviousIteration);
+					nextList2.addAll(listOfItemsOnTheLeftThatWereNotCausingOverflowInThePreviousIteration);
 					nextList2.add(FontedText.newInstance(textToAddThatLeadsToOverflow.substring(0,i), ft.getFont()));
 					DiscordFontedString dft2 = DiscordFontedString.newInstance(nextList2);
 					if(dft2.toRawDiscordText().length()>=numChar)
@@ -118,7 +132,7 @@ public class DiscordFontedString {
 			}
 			
 			indexCurrentList++;
-			listOfItemsOnTheFirstSplitOfTheCurrentStringFromThePreviousIteration.add(ft);
+			listOfItemsOnTheLeftThatWereNotCausingOverflowInThePreviousIteration.add(ft);
 		}
 		throw new Error();
 	}

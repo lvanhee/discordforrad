@@ -5,6 +5,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
+import org.json.simple.JSONObject;
+
 import discordforrad.models.language.LanguageWord;
 
 public class AdjectiveRelatedForms implements RelatedForms, Serializable {
@@ -13,6 +15,10 @@ public class AdjectiveRelatedForms implements RelatedForms, Serializable {
 	
 	public AdjectiveRelatedForms(Map<AdjectiveFormsEnum, LanguageWord>f) {
 		form = GenericRelatedForm.newInstance(f);
+	}
+
+	public AdjectiveRelatedForms(GenericRelatedForm<AdjectiveFormsEnum> forms) {
+		form = forms;
 	}
 
 	public static RelatedForms newInstance(LanguageWord enn, LanguageWord ett, LanguageWord plural, LanguageWord defined,
@@ -44,13 +50,15 @@ public class AdjectiveRelatedForms implements RelatedForms, Serializable {
 	}
 
 	private String getPlural() {
-		if(plural!=null) return plural;
+		/*if(plural!=null) return plural;
 		if(getEnn().endsWith("a"))return "!"+getEnn();
-		return "!"+getEnn()+"a";
+		return "!"+getEnn()+"a";*/
+		throw new Error();
 	}
 
 	private String getEnn() {
-		return enn;
+		//return enn;
+		throw new Error();
 	}
 
 	@Override
@@ -85,5 +93,32 @@ public class AdjectiveRelatedForms implements RelatedForms, Serializable {
 
 		throw new Error();
 	}
+
+	@Override
+	public String toParsableString() {
+		return form.toParsableString();
+	}
+
+	public static RelatedForms parse(String string) {
+		return new AdjectiveRelatedForms(GenericRelatedForm.parse(AdjectiveFormsEnum::valueOf, string));
+	}
+	
+	public boolean equals(Object o) {
+		if(o instanceof AdjectiveRelatedForms)
+			return ((AdjectiveRelatedForms)o).form.equals(form);
+		return false;
+		}
+	
+	public int hashCode() {return form.hashCode();}
+
+	@Override
+	public JSONObject toJsonObject() {
+		return form.toJsonObject();
+	}
+
+	public static RelatedForms fromJsonObject(JSONObject jsonObject) {
+		return new AdjectiveRelatedForms(GenericRelatedForm.fromJsonObject(AdjectiveFormsEnum::valueOf, jsonObject));
+	}
+
 
 }

@@ -5,6 +5,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
+import org.json.simple.JSONObject;
+
 import discordforrad.models.language.LanguageWord;
 
 
@@ -19,6 +21,11 @@ public class VerbAlternativeForm implements RelatedForms, Serializable {
 	}
 	
 	
+	public VerbAlternativeForm(GenericRelatedForm<VerbAlternativeFormEnum> forms) {
+		this.form = forms;
+	}
+
+
 	public static VerbAlternativeForm newInstance(
 			LanguageWord imperativ, LanguageWord infinitiv, LanguageWord presens, LanguageWord presensKonjunktiv,
 			LanguageWord past, LanguageWord preteritumKunjunktiv,
@@ -61,7 +68,7 @@ public class VerbAlternativeForm implements RelatedForms, Serializable {
 
 
 	private String getImperativ() {
-		if(imperativ!=null) return imperativ;
+		/*if(imperativ!=null) return imperativ;
 		if(getPresens()!=null)
 		{
 			String p = getPresens();
@@ -69,19 +76,22 @@ public class VerbAlternativeForm implements RelatedForms, Serializable {
 				return "!"+p.substring(0,p.length()-2);
 			else return "!"+p.substring(0,p.length()-1);
 		}
-		else return null;
+		else return null;*/
+		throw new Error();
 	}
 
 
 	private String getPresens() {
-		if(presens!=null)
+		/*if(presens!=null)
 			return presens;
-		return "!"+getInfinitiv()+"r";
+		return "!"+getInfinitiv()+"r";*/
+		throw new Error();
 	}
 
 
 	private String getInfinitiv() {
-		return infinitiv;
+		//return infinitiv;
+		throw new Error();
 	}
 
 
@@ -106,6 +116,41 @@ public class VerbAlternativeForm implements RelatedForms, Serializable {
 
 	@Override
 	public LanguageWord getGrundform() {
-		return form.get(VerbAlternativeFormEnum.INFINITIV);
+		if(form.getForms().get(VerbAlternativeFormEnum.INFINITIV)!=null)
+			return form.get(VerbAlternativeFormEnum.INFINITIV);
+		else
+			for(VerbAlternativeFormEnum v:VerbAlternativeFormEnum.values())
+				if(form.getForms().get(v)!=null)
+					return form.get(v);
+		throw new Error();
 	}
+
+
+	@Override
+	public String toParsableString() {
+		return form.toParsableString();
+	}
+
+
+	public static RelatedForms parse(String string) {
+		return new VerbAlternativeForm(GenericRelatedForm.parse(VerbAlternativeFormEnum::valueOf, string));
+	}
+	public boolean equals(Object o) {
+		if(!(o instanceof VerbAlternativeForm))return false;
+		return ((VerbAlternativeForm)o).form.equals(form);
+		}
+	
+	public int hashCode() {return form.hashCode();}
+
+
+	@Override
+	public JSONObject toJsonObject() {
+		return form.toJsonObject(); 
+	}
+
+
+	public static RelatedForms fromJsonObject(JSONObject jsonObject) {
+		return new VerbAlternativeForm(GenericRelatedForm.fromJsonObject(VerbAlternativeFormEnum::valueOf,jsonObject));
+	}
+
 }

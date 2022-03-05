@@ -11,6 +11,7 @@ public enum DiscordFont {
 		case INVISIBLE: return "||";
 		case NO_FONT:return "";
 		case ITALICS: return "*";
+		case BOLD: return "**";
 		case BOLD_ITALICS_VISIBLE: return "***";
 		}
 		throw new Error();

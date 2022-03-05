@@ -18,6 +18,7 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import cachingutils.PlainObjectFileBasedCache;
+import cachingutils.TextFileBasedCache;
 import discordforrad.Main;
 import discordforrad.inputUtils.DatabaseProcessingOutcome;
 import discordforrad.inputUtils.EntriesFoundWebscrappingOutcome;
@@ -28,15 +29,22 @@ import discordforrad.models.language.WordDescription.WordType;
 
 public class RelatedFormsNetwork {
 	
-	private static final String PATH_TO_KNOWN_RELATED_NETWORK_TRANSITION_CACHE = Main.ROOT_DATABASE+"caches/related_forms_network.obj";
-	private static final PlainObjectFileBasedCache<Map<LanguageWord, RelatedFormsTransition>> knownTransitionsPerWord =
-			PlainObjectFileBasedCache.loadFromFile(new File(PATH_TO_KNOWN_RELATED_NETWORK_TRANSITION_CACHE), 
-					()->new HashMap<>());
+	private static final String PATH_TO_KNOWN_RELATED_NETWORK_TRANSITION_CACHE = Main.ROOT_DATABASE+"caches/related_forms_network.txt";
+	private static final TextFileBasedCache<LanguageWord, RelatedFormsTransition> knownTransitionsPerWord =
+			TextFileBasedCache.newInstance
+			(
+					new File(PATH_TO_KNOWN_RELATED_NETWORK_TRANSITION_CACHE), 
+					(LanguageWord i)->i.toString(), 
+					(String s)->LanguageWord.parse(s), 
+					(RelatedFormsTransition o)->o.toParsableString(), 
+					(String s)->RelatedFormsTransitionImpl.parse(s),
+					"|"
+			);
 
-	
-	public static RelatedFormsTransition getRelatedForms(LanguageWord lw)
+
+	public static synchronized RelatedFormsTransition getRelatedForms(LanguageWord lw)
 	{
-		if(knownTransitionsPerWord.get().containsKey(lw))return knownTransitionsPerWord.get().get(lw);
+		if(knownTransitionsPerWord.has(lw))return knownTransitionsPerWord.get(lw);
 		
 		RelatedFormsTransition res = RelatedFormsTransitionImpl.newInstance();
 		
@@ -46,25 +54,27 @@ public class RelatedFormsNetwork {
 			res = RelatedFormsTransitionImpl.mergeWithBase(res,formForBase);
 		}
 		
+		
+		
 		for(WordType wt: res.getForms().keySet())
 			for(LanguageWord lw2:res.getForms().get(wt).getRelatedWords())
-				if(knownTransitionsPerWord.get().containsKey(lw2)&&knownTransitionsPerWord.get().get(lw2).equals(res))continue;
+				if(knownTransitionsPerWord.has(lw2)&&knownTransitionsPerWord.get(lw2).equals(res))continue;
 				else
 				{
-					if(! knownTransitionsPerWord.get().containsKey(lw2))
+					if(! knownTransitionsPerWord.has(lw2))
 					{
 						final RelatedFormsTransition tmp = res;
-						knownTransitionsPerWord.get().put(lw2, tmp);
+						knownTransitionsPerWord.add(lw2, tmp);
 					}
 					else 
 						{
 						final RelatedFormsTransition tmp = res;
-						knownTransitionsPerWord.get().put(lw2, 
-							RelatedFormsTransitionImpl.mergeWithBase(knownTransitionsPerWord.get().get(lw2),tmp));
+						knownTransitionsPerWord.replace(lw2, 
+							RelatedFormsTransitionImpl.mergeWithBase(knownTransitionsPerWord.get(lw2),tmp));
 						}
 				}
 		
-		knownTransitionsPerWord.get().put(lw, res);
+		knownTransitionsPerWord.replace(lw, res);
 		
 		
 		return res;
@@ -72,10 +82,10 @@ public class RelatedFormsNetwork {
 	
 	public static void updateCache()
 	{
-		knownTransitionsPerWord.doAndUpdate(x->{});
+		//knownTransitionsPerWord.doAndUpdate(x->{});
 	}
 
-	private static Set<DataBaseEnum> getRelatedFormsDatabase(LanguageWord lw) {
+	public static Set<DataBaseEnum> getRelatedFormsDatabase(LanguageWord lw) {
 		switch (lw.getCode()) {
 		case SV: {
 			return Arrays.asList(
@@ -90,7 +100,7 @@ public class RelatedFormsNetwork {
 
 
 
-	private static RelatedFormsTransition getRelatedForms(LanguageWord lw, DataBaseEnum base) {
+	public static RelatedFormsTransition getRelatedForms(LanguageWord lw, DataBaseEnum base) {
 		switch (base) {
 		case SO: {
 			return getRelatedFormsSo(lw);

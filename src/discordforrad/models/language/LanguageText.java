@@ -5,8 +5,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import discordforrad.LanguageCode;
 import discordforrad.inputUtils.TextInputUtils;
+import discordforrad.models.LanguageCode;
 
 
 public class LanguageText implements Serializable{
@@ -19,9 +19,13 @@ public class LanguageText implements Serializable{
 			throw new Error();
 		this.text = txt;
 		this.lc = l;
+		
+		String aux = TextInputUtils.Utf8ToIso(text);
+		if(!aux.equals(text))
+			throw new Error();
 	}
 	
-	public String toString() {return lc+"|"+text;}
+	public String toString() {return lc+":"+text;}
 
 
 	public LanguageCode getLanguageCode() {
@@ -40,10 +44,10 @@ public class LanguageText implements Serializable{
 	}
 
 	public List<LanguageWord> getListOfValidWords() {
-		
-		return TextInputUtils.toListOfWords(text).stream()
+		List<String> listOfWords = TextInputUtils.toListOfWordsWithoutSymbols(text); 
+		return listOfWords.stream()
 				.map(x->LanguageWord.newInstance(x, lc))
-				.filter(x->Dictionnary.isInDictionnaries(x))
+				.filter(x->Dictionnary.isInDictionnariesWithCrosscheck(x))
 				.collect(Collectors.toList());
 	}
 
@@ -53,6 +57,25 @@ public class LanguageText implements Serializable{
 
 	public static LanguageText newInstance(LanguageWord lw) {
 		return newInstance(lw.getCode(),lw.getWord());
+	}
+	
+	public static LanguageText parse(String s)
+	{
+		if(!s.contains(":"))
+			throw new Error();
+		String head = s.substring(0,s.indexOf(":"));
+		String end = s.substring(s.indexOf(":")+1);
+		return newInstance(LanguageCode.valueOf(head), end);
+	}
+
+	public boolean isSingleWord() {
+		List<LanguageWord> words = getListOfValidWords();
+		
+		return words.size()==1;
+	}
+
+	public LanguageWord toSingleWord() {
+		return getListOfValidWords().get(0);
 	}
 	
 }

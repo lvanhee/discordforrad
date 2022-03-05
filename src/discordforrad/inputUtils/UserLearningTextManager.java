@@ -6,13 +6,21 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import discordforrad.Main;
+import discordforrad.models.LanguageCode;
+import discordforrad.models.language.Dictionnary;
+import discordforrad.models.language.LanguageWord;
+import discordforrad.translation.Translator;
 
 
 public class UserLearningTextManager {
@@ -50,7 +58,7 @@ public class UserLearningTextManager {
 
 
 	public static String add(String languageText) {		
-		String index = indexedEntries.size()+"";
+		String index = (indexedEntries.size()+1)+"";
 		if(indexedEntries.containsKey(index))
 			throw new Error();
 		if(indexedEntries.containsValue(languageText))
@@ -77,10 +85,13 @@ public class UserLearningTextManager {
 	}
 
 
+	private static Map<String, Integer> allOccurrencesCache = null;
 	public static Map<String, Integer> getAllOccurrencesOfEveryWordEverIncludedInUserText() {
+		if(allOccurrencesCache!=null)
+			return allOccurrencesCache;
 		try {
 			String fulltext = Files.readString(LOCATION_RAW_LEARNING_TEXT,Charset.forName("ISO-8859-1"));
-			List<String> allWords = TextInputUtils.toListOfWords(fulltext);
+			List<String> allWords = TextInputUtils.toListOfWordsWithoutSymbols(fulltext);
 			Map<String, Integer> countPerWord = new HashMap<>();
 			for(String s:allWords)
 			{
@@ -88,10 +99,68 @@ public class UserLearningTextManager {
 				countPerWord.put(s, countPerWord.get(s)+1);
 			}
 			
+			allOccurrencesCache = countPerWord;
+			
 			return countPerWord;
 		} catch (IOException e) {
 			e.printStackTrace();
 			throw new Error();
 		}
+	}
+
+
+	public static Set<LanguageWord> getAllPossibleLanguageWords() {
+		return getAllOccurrencesOfEveryWordEverIncludedInUserText().keySet()
+				.stream()
+				.map(x->Arrays.asList(
+						LanguageWord.newInstance(x, LanguageCode.EN),
+						LanguageWord.newInstance(x, LanguageCode.SV)
+						)
+						)
+				.reduce(new ArrayList<LanguageWord>(),(x,y)->{x.addAll(y); return x;})
+				.stream()
+				.sorted((x,y)->x.toString().compareTo(y.toString()))
+				.filter(x->Dictionnary.isInDictionnariesWithCrosscheck(x))
+				.collect(Collectors.toSet());
+	}
+
+	private static Map<LanguageWord, Integer> cacheNumberOfOccurrencesOfTranslationsOfWordsInUserTexts = null;
+	/**
+	 * This function returns all the words for which there exist a translation of this word in user text.
+	 * The returned list of words may include words that are not part of the text corpus, as long as one of their translations
+	 * belong to the text corpus.
+	 * @return
+	 */
+	public static synchronized Map<LanguageWord, Integer> getNumberOfOccurrencesOfTranslationsOfWordsThatHaveATranslationInUserText() {
+		if(cacheNumberOfOccurrencesOfTranslationsOfWordsInUserTexts!=null)
+			return cacheNumberOfOccurrencesOfTranslationsOfWordsInUserTexts;
+		Set<LanguageWord> allWordsAndTheirTranslations = new HashSet<>();
+		allWordsAndTheirTranslations.addAll(getAllPossibleLanguageWords());
+		Set<LanguageWord> allTranslations =
+				allWordsAndTheirTranslations.parallelStream()
+				.map(x->Translator.getTranslationsOf(x))
+				.reduce(new HashSet<LanguageWord>(),(Set<LanguageWord> z,Set<LanguageWord> y)->{synchronized (z) {
+				z.addAll(y); return z;}});
+		
+		allWordsAndTheirTranslations
+		.addAll(
+				allTranslations);
+		
+		Map<LanguageWord, Integer> res = allWordsAndTheirTranslations.parallelStream().collect(Collectors.toMap(Function.identity(), x->
+		Translator.getTranslationsOf(x).stream().map(y->getNumberOfOccurrencesInTheText(y)).reduce(0,(z,y)->z+y)));
+		
+		
+		cacheNumberOfOccurrencesOfTranslationsOfWordsInUserTexts = res;
+		return res;
+	}
+
+
+	public static int getNumberOfOccurrencesInTheText(LanguageWord x) {
+		return getAllOccurrencesOfEveryWordEverIncludedInUserText().getOrDefault(x.getWord(),0);
+	}
+
+
+	public static int getNumberOfOccurrencesInUserTextOfTheTranslationsOfThisWord(LanguageWord word) {
+		return UserLearningTextManager.getNumberOfOccurrencesOfTranslationsOfWordsThatHaveATranslationInUserText().getOrDefault(word,0);
 	}
 }

@@ -57,4 +57,11 @@ public class PronounRelatedForm implements RelatedForms, Serializable {
 				).get();
 	}
 
+	@Override
+	public String toParsableString() {
+		return form.toParsableString();
+	}
+	public boolean equals(Object o) {throw new Error();}
+	public int hashCode() {return form.hashCode();}
+
 }

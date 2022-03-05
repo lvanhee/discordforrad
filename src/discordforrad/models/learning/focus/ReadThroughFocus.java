@@ -12,11 +12,13 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
-import discordforrad.LanguageCode;
+
 import discordforrad.Main;
 import discordforrad.inputUtils.UserLearningTextManager;
 import discordforrad.inputUtils.TextInputUtils;
+import discordforrad.models.LanguageCode;
 import discordforrad.models.language.LanguageText;
 import discordforrad.models.language.LanguageWord;
 
@@ -26,11 +28,13 @@ public class ReadThroughFocus {
 	
 	private final List<LanguageText> texts;
 	private final Map<LanguageText, String> indexes;
+	private final Set<LanguageWord> allWordsInCurrentFocusCache;
 	
 
 	public ReadThroughFocus(List<LanguageText> texts, Map<LanguageText, String> indexes) {
 		this.texts = texts;
 		this.indexes = indexes;
+		allWordsInCurrentFocusCache = texts.parallelStream().map(x->x.getSetOfValidWords()).reduce(new HashSet<>(), (x,y)->{x.addAll(y); return x;});
 	}
 
 	public static ReadThroughFocus loadCurrentFocus() {
@@ -94,4 +98,8 @@ public class ReadThroughFocus {
 	}
 	
 	public String getIndexOf(LanguageText lt) { return indexes.get(lt);}
+
+	public boolean isInCurrentFocus(LanguageWord x) {
+		return allWordsInCurrentFocusCache.contains(x);
+	}
 }

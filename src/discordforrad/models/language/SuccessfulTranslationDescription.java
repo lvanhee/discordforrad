@@ -4,29 +4,34 @@ import java.io.Serializable;
 import java.util.List;
 import java.util.Set;
 
-import discordforrad.LanguageCode;
-import discordforrad.Translator;
+import discordforrad.models.LanguageCode;
 import discordforrad.models.language.WordDescription.WordType;
+import discordforrad.translation.Translator;
 
-public class SuccessfulTranslationDescription implements TranslationDescription, Serializable{
+public class SuccessfulTranslationDescription implements ResultOfTranslationAttempt, Serializable{
 	
 	private final LanguageText translation;
 	private final WordType wordType;
 	private final String additionalExplanation;
-	private final TranslationDescription.Origin translationOrigins;
-	private SuccessfulTranslationDescription(LanguageText translation2, WordType type, String additionalExplanation, TranslationDescription.Origin origin)
+	private final ResultOfTranslationAttempt.Origin translationOrigins;
+	private SuccessfulTranslationDescription(LanguageText translation, WordType type, String additionalExplanation, ResultOfTranslationAttempt.Origin origin)
 	{
 		if(additionalExplanation.contains("<"))
 			throw new Error();
-		if(translation2.getText().contains("<"))
+		if(translation.getText().contains("<"))
 			throw new Error();
-		this.translation = translation2;
+		if(translation.getText().isBlank())
+			throw new Error();
+		this.translation = LanguageText.newInstance(translation.getLanguageCode(),
+				translation.getText().replaceAll(":", ",").replaceAll("-", "").replaceAll(";", "").toLowerCase().trim());
 		this.wordType = type;
 		this.translationOrigins = origin;
-		this.additionalExplanation = additionalExplanation;
+		this.additionalExplanation = 
+				additionalExplanation.replaceAll(";", ",")
+				.trim();
 	}
 	public static SuccessfulTranslationDescription newInstance(LanguageText translation, String additionalExplanation, WordType type, 
-			TranslationDescription.Origin origin) {
+			ResultOfTranslationAttempt.Origin origin) {
 		return new SuccessfulTranslationDescription(translation, type, additionalExplanation, origin);
 	}
 	
@@ -34,6 +39,22 @@ public class SuccessfulTranslationDescription implements TranslationDescription,
 	{
 		return translation+" "+additionalExplanation+" "+wordType+" "+translationOrigins;
 	}
+	
+	public String toParsableString() {
+		
+		LanguageText clearedTranslation = LanguageText.newInstance(translation.getLanguageCode(),
+				translation.getText().replaceAll(":", ",").replaceAll("-", ""));
+		String res = clearedTranslation+"|"+wordType+"|"+additionalExplanation+"|"+translationOrigins;
+		
+		ResultOfTranslationAttempt parsed = parse(res);
+		if(!parsed.equals(this))
+			throw new Error();
+		if(res.contains(";"))
+			throw new Error();
+		return res;
+	}
+	
+	
 	public LanguageText getTranslatedText() {
 		return translation;
 	}
@@ -54,6 +75,7 @@ public class SuccessfulTranslationDescription implements TranslationDescription,
 	
 	public boolean equals(Object o)
 	{
+		if(!(o instanceof SuccessfulTranslationDescription))return false;
 		SuccessfulTranslationDescription td = (SuccessfulTranslationDescription)o;
 		return td.translation.equals(translation)&&
 				td.wordType.equals(wordType)&&
@@ -61,7 +83,7 @@ public class SuccessfulTranslationDescription implements TranslationDescription,
 				td.translationOrigins.equals(translationOrigins);
 	}
 	public static SuccessfulTranslationDescription newInstance(LanguageWord word) {
-		
+		/*
 		if(WITH_GOOGLE_TRANSLATE)
 			translations.add(
 					SuccessfulTranslationDescription.newInstance(
@@ -72,12 +94,24 @@ public class SuccessfulTranslationDescription implements TranslationDescription,
 		
 		translations.addAll(Translator.getWordReferenceTranslationsFrom(lw,translateTo));
 
-		return translations;
+		return translations;*/
+		throw new Error();
 		
 		
 	}
 	public Origin getOrigin() {
 		return translationOrigins;
+	}
+	static ResultOfTranslationAttempt parse(String x) {
+		String[] result = x.split(""
+				+ "\\|");
+		if(result.length!=4)throw new Error();
+		LanguageWord lw = LanguageWord.parse(result[0].trim());
+		WordType type = WordType.parse(result[1]);
+		String additionalExplanation = result[2];
+		Origin origin = Origin.valueOf(result[3]);
+		
+		return newInstance(LanguageText.newInstance(lw), additionalExplanation, type, origin);
 	}
 
 }

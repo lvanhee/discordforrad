@@ -5,6 +5,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
+import org.json.simple.JSONObject;
+
 import discordforrad.models.language.LanguageWord;
 
 public class NounAlternativeForm implements RelatedForms, Serializable {
@@ -12,6 +14,10 @@ public class NounAlternativeForm implements RelatedForms, Serializable {
 
 	public NounAlternativeForm(Map<NounFormEnum, LanguageWord> forms) {
 		this.gen = GenericRelatedForm.newInstance(forms);
+	}
+
+	public NounAlternativeForm(GenericRelatedForm<NounFormEnum> forms) {
+		gen = forms;
 	}
 
 	public static RelatedForms newInstance(Map<NounFormEnum, LanguageWord> forms) {
@@ -29,8 +35,9 @@ public class NounAlternativeForm implements RelatedForms, Serializable {
 	}
 
 	private String getBesPlu() {
-		if(besPlu!=null)return besPlu;
-		return "!"+obePlu+"na";
+		/*if(besPlu!=null)return besPlu;
+		return "!"+obePlu+"na";*/
+		throw new Error();
 	}
 
 	@Override
@@ -55,6 +62,30 @@ public class NounAlternativeForm implements RelatedForms, Serializable {
 			if(gen.get(n)!=null)return gen.get(n);
 		throw new Error();
 	}
+
+	@Override
+	public String toParsableString() {
+		return gen.toParsableString();
+	}
+
+	public static RelatedForms parse(String string) {
+		return new NounAlternativeForm(GenericRelatedForm.parse(NounFormEnum::valueOf,string));
+	}
+	public boolean equals(Object o) {
+		if(!(o instanceof NounAlternativeForm))return false;
+		return ((NounAlternativeForm)o).gen.equals(gen);
+		}
 	
+	public int hashCode() {return gen.hashCode();}
+
+	@Override
+	public JSONObject toJsonObject() {
+		return gen.toJsonObject();
+	}
+
+	public static RelatedForms fromJsonObject(JSONObject jsonObject) {
+		return new NounAlternativeForm(GenericRelatedForm.fromJsonObject(NounFormEnum::valueOf, jsonObject));
+	}
+
 
 }

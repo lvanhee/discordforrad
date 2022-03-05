@@ -34,21 +34,22 @@ import com.sedmelluq.discord.lavaplayer.track.BaseAudioTrack;
 
 import discordforrad.AddStringResultContext;
 import discordforrad.DisOrdforrAI;
-import discordforrad.LanguageCode;
 import discordforrad.Main;
-import discordforrad.Translator;
 import discordforrad.discordmanagement.audio.PlayerManager;
 import discordforrad.inputUtils.TextInputUtils;
+import discordforrad.inputUtils.UserLearningTextManager;
+import discordforrad.models.LanguageCode;
 import discordforrad.models.VocabularyLearningStatus;
 import discordforrad.models.language.Dictionnary;
 import discordforrad.models.language.LanguageText;
 import discordforrad.models.language.LanguageWord;
 import discordforrad.models.language.StringPair;
 import discordforrad.models.language.SuccessfulTranslationDescription;
-import discordforrad.models.language.TranslationDescription;
+import discordforrad.models.language.ResultOfTranslationAttempt;
 import discordforrad.models.language.WordDescription;
 import discordforrad.models.language.WordDescription.WordType;
 import discordforrad.models.learning.focus.ReadThroughFocus;
+import discordforrad.translation.Translator;
 import net.dv8tion.jda.api.entities.Message.Attachment;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
@@ -132,17 +133,23 @@ public class DiscordManager extends ListenerAdapter {
 		}
 		else if (event.getMessage().getContentRaw().equals("F")) {
 			DisOrdforrAI.INSTANCE.forbidLastWord();
-			DisOrdforrAI.INSTANCE.askForNextWord();
+			DisOrdforrAI.INSTANCE.processPostWordAttempt();
 		}
 		else if (event.getMessage().getContentRaw().equals("/new-session")) {
 			DisOrdforrAI.INSTANCE.startNewSession();
-
+		}
+		else if (event.getMessage().getContentRaw().equals("/all-words")) {
+			print(
+			DisOrdforrAI.INSTANCE.getVocabularyLearningStatus().getAllLongTermWords()
+			.stream()
+			.sorted((x,y)->x.toString().compareTo(y.toString()))
+			.collect(Collectors.toList()).toString());
 		}
 		else
 			if (event.getMessage().getContentRaw().equalsIgnoreCase("n")) {	
 
 				try {
-					DisOrdforrAI.INSTANCE.forgottenLastWord();
+					DisOrdforrAI.INSTANCE.recordFailedToRecallLastWord();
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
@@ -223,7 +230,7 @@ public class DiscordManager extends ListenerAdapter {
 				if(!currentString.isEmpty())
 				{
 					LanguageWord lw = LanguageWord.newInstance(currentString, languageCode);
-					if(vls.isLongTermWord(lw)||!Dictionnary.isInDictionnaries(lw)||vls.isForbiddenWord(lw))
+					if(vls.isLearnedWordWord(lw)||!Dictionnary.isInDictionnariesWithCrosscheck(lw)||vls.isForbiddenWord(lw))
 						res.add(FontedText.newInstance(currentString, DiscordFont.BOLD_ITALICS_VISIBLE));
 					else if(vls.isEarlyPhaseWord(lw))
 						res.add(FontedText.newInstance(currentString, DiscordFont.ITALICS));
@@ -240,8 +247,8 @@ public class DiscordManager extends ListenerAdapter {
 		if(!currentString.isEmpty())
 		{
 			LanguageWord currentWord = LanguageWord.newInstance(currentString, languageCode);
-			if(vls.isLongTermWord(currentWord)||
-					!Dictionnary.isInDictionnaries(currentWord)||
+			if(vls.isLearnedWordWord(currentWord)||
+					!Dictionnary.isInDictionnariesWithCrosscheck(currentWord)||
 					vls.isForbiddenWord(currentWord))
 				res.add(FontedText.newInstance(currentString, DiscordFont.BOLD_ITALICS_VISIBLE));
 			if(vls.isEarlyPhaseWord(currentWord))
@@ -257,11 +264,14 @@ public class DiscordManager extends ListenerAdapter {
 	public static void print(WordDescription description) {
 		print("||"+getHiddenAnswerStringFor(description)+"||");
 	}
+	
+	public static String getHiddenAnswerStringFor(LanguageWord lw){
+		return getHiddenAnswerStringFor(WordDescription.getDescriptionFor(lw));
+	}
 
 	public static String getHiddenAnswerStringFor(WordDescription description) {
-
+		
 		String toPrint = "";//description.toString();
-		String translationText = "";
 
 		String wordTypesToPrint = "";
 
@@ -270,13 +280,10 @@ public class DiscordManager extends ListenerAdapter {
 			wordTypesToPrint+=wt+" "+description.getAlternativesFor(wt)+"\n";
 		}
 
-		toPrint += wordTypesToPrint+"\n\n";
 
-
-
+		if(!wordTypesToPrint.isBlank())
+			toPrint += wordTypesToPrint+"\n\n";
 		
-
-
 		toPrint+=Translator.getNiceTranslationString(description.getWord(),true)+"\n\n";
 
 		toPrint+="Subforms:\n";

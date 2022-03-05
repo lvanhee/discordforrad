@@ -4,8 +4,10 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
-import discordforrad.LanguageCode;
+import org.json.simple.JSONObject;
+
 import discordforrad.inputUtils.WebScrapping.DataBaseEnum;
+import discordforrad.models.LanguageCode;
 import discordforrad.models.language.LanguageWord;
 import discordforrad.models.language.WordDescription;
 import discordforrad.models.language.WordDescription.WordType;
@@ -33,11 +35,11 @@ public interface RelatedForms {
 		GRUNDFORM_UTRUM_SINGULAR,GRUNDFORM_UTRUM_PLURAL, GRUNDFORM_NEUTRUM, GRUNDFORM_PLURAL, GENITIV_UTRUM_SINGULAR,
 		OBJEKTSFORM_SINGULAR,OBJEKTSFORM_PLURAL
 	}
-	
+
 	public enum AdjectiveFormsEnum implements RelatedFormType {
 		ENN, ETT,  PLURAL, DEFINED,MASCULINUM, COMPARATIVE, SUPERLATIVE, SUPERLATIVE_DEFINED		
 	}
-	
+
 	public enum VerbAlternativeFormEnum implements RelatedFormType{
 		IMPERATIV, INFINITIV, PRESENS, PRETERITUM, SUPINUM,
 		PRESENS_PARTICIP, PAST_PARTICIP_ENN, PAST_PARTICIP_ETT, PAST_PARTICIP_PLUR, PERFEKT_PARTICIP_DEF,
@@ -53,15 +55,7 @@ public interface RelatedForms {
 
 		WordType wt = WordType.parseRaw(wholeForm, db);
 
-		if(wt.equals(WordType.ADV)
-				||wt.equals(WordType.CONJ)
-				||wt.equals(WordType.UNDEFINED)
-				||wt.equals(WordType.RAKN)
-				||wt.equals(WordType.INTERJ)
-				||wt.equals(WordType.NAME)
-				||wt.equals(WordType.PRON)
-				||wt.equals(WordType.ARTICLE)
-				||wt.equals(WordType.PREP))
+		if(isUnmodifiableWordType(wt))
 			return UnmodifiableAlternativeForm.newInstance(lw);
 		if(wt.equals(WordType.V))
 		{
@@ -125,7 +119,7 @@ public interface RelatedForms {
 							String headerNewForm = "<span class=\"bform\">";
 							subbit = subbit.substring(subbit.indexOf(headerNewForm)+headerNewForm.length());
 							if(subbit.trim().startsWith("Finita former"))continue;
-							String payload = subbit.substring(0, subbit.indexOf("</span>")).trim();
+							String payload = subbit.substring(0, subbit.indexOf("</span>")).replaceAll("-", "").trim();
 							String type = subbit.substring(subbit.indexOf(subsplitType)+subsplitType.length());
 							type = type.substring(0,type.indexOf("</td>")).trim();
 							if(type.equals("presens aktiv")||type.equals("presens deponens")) {presens = LanguageWord.newInstance(payload,LanguageCode.SV);; continue;}
@@ -151,7 +145,7 @@ public interface RelatedForms {
 					}
 					if(bit.trim().startsWith("att"))
 					{
-						String payload = bit.substring(bit.indexOf(PAYLOAD_BEACON_SAOL)+PAYLOAD_BEACON_SAOL.length(), bit.indexOf("</span>")).trim();
+						String payload = bit.substring(bit.indexOf(PAYLOAD_BEACON_SAOL)+PAYLOAD_BEACON_SAOL.length(), bit.indexOf("</span>")).trim().replaceAll("-", "");
 						if(!bit.contains(subsplitType))continue;
 						String type = bit.substring(bit.indexOf(subsplitType)+subsplitType.length());
 						type = type.substring(0,type.indexOf("</td>")).trim();
@@ -245,6 +239,19 @@ public interface RelatedForms {
 	}
 
 
+	public static boolean isUnmodifiableWordType(WordType wt) {
+		return wt.equals(WordType.ADV)
+				||wt.equals(WordType.CONJ)
+				||wt.equals(WordType.UNDEFINED)
+				||wt.equals(WordType.RAKN)
+				||wt.equals(WordType.INTERJ)
+				||wt.equals(WordType.NAME)
+				||wt.equals(WordType.PRON)
+				||wt.equals(WordType.ARTICLE)
+				||wt.equals(WordType.PREP);
+	}
+
+
 	public static RelatedForms parseAdjective(String wholeForm, DataBaseEnum db) {
 		LanguageWord enn = null;
 		LanguageWord ett = null;
@@ -291,7 +298,7 @@ public interface RelatedForms {
 				else if(split.trim().startsWith("används"))continue;
 				else if(split.trim().startsWith("komparativ"))komparativ = LanguageWord.newInstance(actualContents.trim(), LanguageCode.SV);
 				else continue;
-//					throw new Error();
+				//					throw new Error();
 			}
 
 		}
@@ -303,7 +310,7 @@ public interface RelatedForms {
 			int mode = DEFAULT;
 
 			String forms = wholeForm.substring(wholeForm.indexOf(SAOL_FORMS_SPLITTER_TOKEN));
-			
+
 			boolean isUnmodifiableAdjective = wholeForm.substring(0, wholeForm.indexOf("<")).trim()
 					.equals("oböjligt adjektiv");
 
@@ -433,9 +440,9 @@ public interface RelatedForms {
 				if(typeRelation.equals("objektsform"))
 					if(mode==SINGULAR) {res.put(PronounFormEnum.OBJEKTSFORM_SINGULAR, LanguageWord.newInstance(payload, LanguageCode.SV)); continue;}
 					else if(mode==PLURAL) {res.put(PronounFormEnum.OBJEKTSFORM_PLURAL, LanguageWord.newInstance(payload, LanguageCode.SV)); continue;}
-				
-				
-			//	throw new Error();
+
+
+				//	throw new Error();
 			}
 
 		}
@@ -445,11 +452,11 @@ public interface RelatedForms {
 			String payload = wholeForm.substring(
 					wholeForm.indexOf(header)+header.length());
 			payload  =payload.substring(0,payload.indexOf("<")).trim();
-			
+
 			res.put(PronounFormEnum.GRUNDFORM_UTRUM_SINGULAR, LanguageWord.newInstance(payload,LanguageCode.SV));
-					
+
 		}
-		
+
 
 		return PronounRelatedForm.newInstance(res);
 	}
@@ -468,10 +475,10 @@ public interface RelatedForms {
 
 			final int UNDEFINED = 0; final int SINGULAR = 1; final int PLURAL = 2;
 			int mode = UNDEFINED;
-			
+
 			String wholeHeader = wholeForm.substring(0,wholeForm.indexOf("<")).trim();
 			boolean isSpecialAdjective = wholeHeader.equals("adjektiviskt slutled")||wholeHeader.equals("oböjligt substantiv");
-			
+
 			if(isSpecialAdjective)
 			{
 				return UnmodifiableAlternativeForm.newInstance(lw);
@@ -491,19 +498,55 @@ public interface RelatedForms {
 					payload = payload.substring(1);
 				String typeRelation = bit.substring(bit.indexOf(SAOL_RELATION_INDICATOR)+ SAOL_RELATION_INDICATOR.length());
 				typeRelation = typeRelation.substring(0,typeRelation.indexOf("<")).trim();
-
-				if(typeRelation.equals("obestämd form"))
+				
+				if(wholeHeader.equals("substantiv i plural"))
+					System.out.print("");
+				if(typeRelation.equals("obestämd form")//||wholeHeader.equals("substantiv i plural")
+						)
 					if(mode==SINGULAR) {res.put(NounFormEnum.OBESTAMD_FORM_SINGULAR, LanguageWord.newInstance(payload, LanguageCode.SV)); continue;}
-					else if(mode==PLURAL) {res.put(NounFormEnum.OBESTAMD_FORM_PLURAL, LanguageWord.newInstance(payload, LanguageCode.SV)); continue;}
+					else if(mode==PLURAL//|| wholeHeader.equals("substantiv i plural")
+							) {
+						if(payload.endsWith(":n")
+								||payload.endsWith(":er")
+								||payload.endsWith(":ar")
+								)
+							payload = payload.replaceAll(":", "-");
+						res.put(NounFormEnum.OBESTAMD_FORM_PLURAL, LanguageWord.newInstance(payload, LanguageCode.SV)); continue;}
 				if(typeRelation.equals("obestämd form genitiv"))
-					if(mode==SINGULAR) {res.put(NounFormEnum.OBESTAMD_FORM_GENITIV_SINGULAR, LanguageWord.newInstance(payload, LanguageCode.SV)); continue;}
-					else if(mode==PLURAL) {res.put(NounFormEnum.OBESTAMD_FORM_GENITIV_PLURAL, LanguageWord.newInstance(payload, LanguageCode.SV)); continue;}
+					if(mode==SINGULAR) {
+						if(payload.endsWith(":s"))payload = payload.replaceAll(":", "-");
+						res.put(NounFormEnum.OBESTAMD_FORM_GENITIV_SINGULAR, LanguageWord.newInstance(payload, LanguageCode.SV)); continue;}
+					else if(mode==PLURAL) {
+						if(payload.endsWith(":ns")||payload.endsWith(":ers")||
+								payload.endsWith(":ars")||
+								payload.endsWith(":s"))payload = payload.replaceAll(":", "-");
+						res.put(NounFormEnum.OBESTAMD_FORM_GENITIV_PLURAL, LanguageWord.newInstance(payload, LanguageCode.SV)); continue;}
 				if(typeRelation.equals("bestämd form"))
-					if(mode==SINGULAR) {res.put(NounFormEnum.BESTAMD_FORM_SINGULAR, LanguageWord.newInstance(payload, LanguageCode.SV)); continue;}
-					else if(mode==PLURAL) {res.put(NounFormEnum.BESTAMD_FORM_PLURAL, LanguageWord.newInstance(payload, LanguageCode.SV)); continue;}
+					if(mode==SINGULAR) {
+						if(payload.endsWith(":et")||
+								payload.endsWith(":t")||
+								payload.endsWith(":n")||
+								payload.endsWith(":en")
+								)payload = payload.replaceAll(":", "-");
+						res.put(NounFormEnum.BESTAMD_FORM_SINGULAR, LanguageWord.newInstance(payload, LanguageCode.SV)); continue;}
+					else if(mode==PLURAL) {
+						if(payload.endsWith(":na")||payload.endsWith(":erna")||
+								payload.endsWith(":arna")||
+								payload.endsWith(":en"))payload = payload.replaceAll(":", "-");
+						res.put(NounFormEnum.BESTAMD_FORM_PLURAL, LanguageWord.newInstance(payload, LanguageCode.SV)); continue;}
 				if(typeRelation.equals("bestämd form genitiv"))
-					if(mode==SINGULAR) {res.put(NounFormEnum.BESTAMD_FORM_GENITIV_SINGULAR, LanguageWord.newInstance(payload, LanguageCode.SV)); continue;}
-					else if(mode==PLURAL) {res.put(NounFormEnum.BESTAMD_FORM_GENITIV_PLURAL, LanguageWord.newInstance(payload, LanguageCode.SV)); continue;}
+					if(mode==SINGULAR) {
+						if(payload.endsWith(":ets")||
+								payload.endsWith(":ts")||
+								payload.endsWith(":ns")||
+								payload.endsWith(":ens")
+								)payload = payload.replaceAll(":", "-");
+						res.put(NounFormEnum.BESTAMD_FORM_GENITIV_SINGULAR, LanguageWord.newInstance(payload, LanguageCode.SV)); continue;}
+					else if(mode==PLURAL) {
+						if(payload.endsWith(":nas")||payload.endsWith(":ernas")||
+								payload.endsWith(":arnas")||
+								payload.endsWith(":ens"))payload = payload.replaceAll(":", "-");
+						res.put(NounFormEnum.BESTAMD_FORM_GENITIV_PLURAL, LanguageWord.newInstance(payload, LanguageCode.SV)); continue;}
 				if(typeRelation.equals("i vissa uttryck"))
 				{res.put(NounFormEnum.OTHER, LanguageWord.newInstance(payload, LanguageCode.SV)); continue;}
 
@@ -591,6 +634,9 @@ public interface RelatedForms {
 				String pretetitumStart = wholeForm.substring(wholeForm.indexOf("<span class=\"bojning\">"));
 				String payload = pretetitumStart.substring(new String("<span class=\"bojning\">").length(), pretetitumStart.indexOf("</span>")).trim();
 				if(payload.startsWith("-"))payload = payload.substring(1);
+				if(payload.endsWith(":et")||payload.endsWith(":t")||payload.endsWith(":er")
+						||payload.endsWith(":ar")
+						||payload.endsWith(":n")||payload.endsWith(":en"))payload = payload.replaceAll(":", "-");
 				res.put(NounFormEnum.BESTAMD_FORM_SINGULAR,LanguageWord.newInstance(payload, LanguageCode.SV));
 			}
 
@@ -600,6 +646,11 @@ public interface RelatedForms {
 				String pretetitumStart = wholeForm.substring(wholeForm.indexOf("<span class=\"bojning\">"));
 				String payload = pretetitumStart.substring(new String("<span class=\"bojning\">").length(), pretetitumStart.indexOf("</span>")).trim();
 				if(payload.startsWith("-")) payload = payload.substring(1);
+				if(payload.endsWith(":n")
+						||payload.endsWith(":er")
+						||payload.endsWith(":en")
+						||payload.endsWith(":t")
+						||payload.endsWith(":ar")) payload = payload.replaceAll(":", "-");
 				res.put(NounFormEnum.OBESTAMD_FORM_PLURAL,LanguageWord.newInstance(payload, LanguageCode.SV));
 			}
 
@@ -609,8 +660,22 @@ public interface RelatedForms {
 				String pretetitumStart = wholeForm.substring(wholeForm.indexOf("<span class=\"bojning\">"));
 				String payload = pretetitumStart.substring(new String("<span class=\"bojning\">").length(), pretetitumStart.indexOf("</span>")).trim();
 				if(payload.startsWith("-")) payload = payload.substring(1);
+				if(payload.endsWith(":n")
+						||payload.endsWith(":en")
+						||payload.endsWith(":et")
+						)payload = payload.replaceAll(":", "-");
 				res.put(NounFormEnum.OBESTAMD_FORM_PLURAL,LanguageWord.newInstance(payload, LanguageCode.SV));
 			}
+		}
+		
+		if(res.isEmpty())
+		{
+			if(!wholeForm.contains("Ordform(er)"))
+				throw new Error();
+			String start = wholeForm.substring(wholeForm.indexOf("Ordform(er)"));
+			start  = start.substring(start.indexOf("<span class=\"bform\">")+20);
+			start = start.substring(0,start.indexOf("</span>")).trim();
+			return UnmodifiableAlternativeForm.newInstance(LanguageWord.newInstance(start, lw.getCode()));
 		}
 
 		return NounAlternativeForm.newInstance(res);
@@ -625,4 +690,41 @@ public interface RelatedForms {
 
 	public LanguageWord getGrundform();
 
+
+	public static RelatedForms parse(WordType wt, String string) {
+		if(string.endsWith("unmodifiable"))
+			return UnmodifiableAlternativeForm.newInstance(LanguageWord.parse(string.substring(0, string.indexOf(":unmodifiable"))));
+		switch (wt) {
+		case ADV: throw new Error();
+		case N: return NounAlternativeForm.parse(string);
+		case V: return VerbAlternativeForm.parse(string);
+		case ADJ: return AdjectiveRelatedForms.parse(string);
+		default:
+			throw new IllegalArgumentException("Unexpected value: " + wt);
+		}
+		//throw new Error();
+	}
+
+
+	public String toParsableString();
+
+
+	public JSONObject toJsonObject();
+
+
+	public static RelatedForms fromJsonObject(WordType wt, JSONObject jsonObject) {
+		if(isUnmodifiableWordType(wt)||jsonObject.containsKey("UNMODIFIABLE"))
+			return UnmodifiableAlternativeForm.fromJsonObject(jsonObject);
+		
+		switch (wt) {
+		case V: 
+			return VerbAlternativeForm.fromJsonObject(jsonObject);
+		case N:
+			return NounAlternativeForm.fromJsonObject(jsonObject);
+		case ADJ:
+			return AdjectiveRelatedForms.fromJsonObject(jsonObject);
+		default:
+			throw new IllegalArgumentException("Unexpected value: " + wt);
+		}
+	}
 }

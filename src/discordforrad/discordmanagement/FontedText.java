@@ -21,17 +21,18 @@ public class FontedText {
 		return text;
 	}
 
-	public static boolean isSensitiveToFonting(String text2) {
+	public static boolean isBlendableWithPreviousFontedText(String text2) {
 		for(int i = 0 ; i < text2.length();i++)
 		{
-			if(isCharacterSensitiveToFonting(text2.charAt(i)))
-				return true;
+			if(!isCharacterBlendableWithPreviousFontedText(text2.charAt(i)))
+				return false;
 		}
-		return false;
+		return true;
 	}
 
-	private static boolean isCharacterSensitiveToFonting(char c) {
-		return !(c==' ' || c=='\n'|| c=='\t'|| c=='\r');
+	private static boolean isCharacterBlendableWithPreviousFontedText(char c) {
+		return !(Character.isAlphabetic(c));
+//		return !(c==' ' || c=='\n'|| c=='\t'|| c=='\r'||c=='-'||c==',');
 	}
 
 	public static FontedText newInstance(String text, DiscordFont font) {

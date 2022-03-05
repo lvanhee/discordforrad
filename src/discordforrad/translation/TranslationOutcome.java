@@ -1,3 +1,4 @@
 package discordforrad.translation;
 
-public interface TranslationOutcome {}
+public interface TranslationOutcome {
+}

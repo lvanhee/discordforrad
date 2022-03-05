@@ -1,5 +1,7 @@
 package discordforrad.models.language;
 
+import org.json.simple.JSONObject;
+
 public class StringPair {
 	private final String left;
 	private final String right;
@@ -22,6 +24,11 @@ public class StringPair {
 	public String toString()
 	{
 		return left+":"+right;
+	}
+
+
+	public static StringPair fromJsonObject(JSONObject x) {
+		return new StringPair((String)x.get("left"), (String)x.get("right"));
 	}
 
 }

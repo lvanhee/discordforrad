@@ -13,4 +13,5 @@ module discordforrad {
 	requires lavaplayer;
 	requires cachingutils;
 	requires java.desktop;
+	requires json.simple;
 }

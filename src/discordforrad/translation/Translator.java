@@ -1,14 +1,9 @@
-package discordforrad;
+package discordforrad.translation;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
@@ -19,47 +14,76 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
-import cachingutils.PlainObjectFileBasedCache;
+import cachingutils.TextFileBasedCache;
+import discordforrad.Main;
 import discordforrad.inputUtils.DatabaseProcessingOutcome;
 import discordforrad.inputUtils.TextInputUtils;
 import discordforrad.inputUtils.WebScrapping;
 import discordforrad.inputUtils.WebScrapping.DataBaseEnum;
 import discordforrad.inputUtils.databases.BabLaProcessing;
+import discordforrad.models.LanguageCode;
 import discordforrad.models.language.LanguageText;
 import discordforrad.models.language.LanguageWord;
 import discordforrad.models.language.SuccessfulTranslationDescription;
 import discordforrad.models.language.WordDescription;
-import discordforrad.models.language.TranslationDescription;
-import discordforrad.models.language.TranslationDescription.Origin;
+import discordforrad.models.language.ResultOfTranslationAttempt;
+import discordforrad.models.language.ResultOfTranslationAttempt.Origin;
 import discordforrad.models.language.WordDescription.WordType;
 import discordforrad.models.language.wordnetwork.forms.SingleEntryWebScrapping;
-import discordforrad.translation.TranslationOutcomeFailure;
 
 public class Translator {
 
-	private static final String ENGLISH_CODE = "en";
-	private static final String SWEDISH_CODE = "sv";
+
+	private static final File PATH_TO_GOOGLE_TRANSLATE_CACHE = new File(Main.ROOT_DATABASE+"databases/known_google_translate_word_translations.txt");
+
+	private static final TextFileBasedCache<LanguageWord, LanguageText> translatedGoogleWords=
+			TextFileBasedCache.newInstance(
+					PATH_TO_GOOGLE_TRANSLATE_CACHE,
+					i->i.toString(),
+					LanguageWord::parse,
+					o->o.toString(),
+					LanguageText::parse,"\t");
+
+	private static final File PATH_TO_TRANSLATION_CACHE = new File(Main.ROOT_DATABASE+"caches/already_computed_translations.txt");
+	private static final File PATH_TO_SENTENCE_TRANSLATION_CACHE = new File(Main.ROOT_DATABASE+"databases/google_translated_sentences_database.txt");
+
+	private static final TextFileBasedCache<LanguageWord, List<ResultOfTranslationAttempt>> translationAttemptsCache=
+			TextFileBasedCache.newInstance(
+					PATH_TO_TRANSLATION_CACHE,
+					i->i.toString(),
+					LanguageWord::parse,
+					o->{if(o.isEmpty()) return ""; else return o.stream().map(x->x.toParsableString()).reduce("",(x,y)->x+";"+y).substring(1);},
+					ResultOfTranslationAttempt::parseList,"\t");
 	
-	
-	private static final File PATH_TO_GOOGLE_TRANSLATE_CACHE = new File(Main.ROOT_DATABASE+"caches/google_translate_word_translation_cache.obj");
-	
-	private static final PlainObjectFileBasedCache<Map<LanguageWord, LanguageText>> translatedWords=
-			PlainObjectFileBasedCache.loadFromFile(PATH_TO_GOOGLE_TRANSLATE_CACHE, ()->{return new HashMap<LanguageWord, LanguageText>();});
-	
+	private static final TextFileBasedCache<LanguageText, LanguageText> textTranslationCache=
+			TextFileBasedCache.newInstance(
+					PATH_TO_SENTENCE_TRANSLATION_CACHE,
+					i->i.toString(),
+					LanguageText::parse,
+					o->o.toString(),
+					LanguageText::parse,"\t");
+
+
 	/* public static void main(String[] args) throws IOException {
         String text = "Hello world!";
         System.out.println("Translated text: " + translate(ENGLISH_CODE, SWEDISH_CODE, text));
     }*/
 
-	private static TranslationDescription getOutcomeOfGoogleTranslation(LanguageText originalText, LanguageCode langTo) {
+	private static boolean cacheFailedTooManyAttemptsGoogle = false; 
+	private static ResultOfTranslationAttempt getOutcomeOfGoogleTranslation(LanguageText originalText, LanguageCode langTo) {
+		
 		assert(!originalText.getLanguageCode().equals(langTo));
+		if(cacheFailedTooManyAttemptsGoogle)
+			return TranslationOutcomeFailure.newInstance(discordforrad.models.language.ResultOfTranslationAttempt.Origin.GOOGLE);
 		String text = originalText.getText();
 		if(text.length()>1900) return TranslationOutcomeFailure.newInstance(Origin.GOOGLE);
 		try {
 			String encodedString = URLEncoder.encode(text, TextInputUtils.UTF8.displayName());
-			String urlStr = "https://script.google.com/macros/s/AKfycbxUDfPgQoUEHg37I0WBHkV9GVkyJdDe1NpCkRh5rMqbhw52Em5G/exec" +
+
+			String urlStr = "https://script.google.com/macros/s/AKfycbxFY_r7smMbqD5o9_zLa0dj9jZtWaG0Lazqi1Fd34KYTLvrF_E/exec" +
 					"?q=" + encodedString +
 					"&target=" + toGoogleUrlString(langTo) +
 					"&source=" + toGoogleUrlString(originalText.getLanguageCode());
@@ -80,15 +104,45 @@ public class Translator {
 			{
 				if(res.contains("Tjänsten har använts för många gånger under en dag: translate"))
 				{
-					translatedWords.doAndUpdate(x->{});
-					return TranslationOutcomeFailure.newInstance(discordforrad.models.language.TranslationDescription.Origin.GOOGLE);
+					System.err.println("GOOGLE TRANSLATION HAS BEEN OVERUSED TODAY");
+					
+					cacheFailedTooManyAttemptsGoogle = true;
+
+					new Thread(()->
+					{
+						try {
+							Thread.sleep(60000);
+						} catch (InterruptedException e1) {
+							e1.printStackTrace();
+						}
+						cacheFailedTooManyAttemptsGoogle = false;
+					}).start();
+
+					if(Main.SHUTDOWN_WHEN_RUNNING_OUT_OF_GOOGLE_TRANSLATE)
+					{
+						System.err.println("ABOUT TO KILL THE WHOLE SYSTEM AS GOOGLE TRANSLATE IS NOT WORKING");
+					    Runtime runtime = Runtime.getRuntime();
+					    try {
+					    	Thread.sleep(60000);
+							Process proc = runtime.exec("shutdown -s -t 0");
+						} catch (IOException e) {
+							e.printStackTrace();
+						} catch (InterruptedException e) {
+							e.printStackTrace();
+						}
+					   // System.exit(0);
+					}
+					return TranslationOutcomeFailure.newInstance(discordforrad.models.language.ResultOfTranslationAttempt.Origin.GOOGLE);
 				}
-				
+
 				try {Thread.sleep(1000);} catch (InterruptedException e) {e.printStackTrace();}
 				return getOutcomeOfGoogleTranslation(originalText, langTo);
 			}
 			if(res.contains("¿½"))
 				throw new Error();
+
+			System.out.println("Translator: Translating via google: "+originalText+" -> "+res.toLowerCase());
+
 			return SuccessfulTranslationDescription.newInstance
 					(LanguageText.newInstance(langTo,res.toLowerCase()), "", WordType.UNDEFINED, Origin.GOOGLE);
 
@@ -103,59 +157,86 @@ public class Translator {
 		return lc.toString().toLowerCase();
 	}
 
-	public static TranslationDescription getGoogleTranslation(LanguageText input, LanguageCode translateTo) {
-		return getOutcomeOfGoogleTranslation(input, translateTo);
-	}
-
-	public static TranslationDescription getGoogleTranslation(LanguageWord lw, LanguageCode to) {
-		if(translatedWords.get().containsKey(lw))
-			return SuccessfulTranslationDescription
-				.newInstance(translatedWords.get().get(lw), "",
-						WordType.UNDEFINED, discordforrad.models.language.TranslationDescription.Origin.GOOGLE);
-		TranslationDescription res = getOutcomeOfGoogleTranslation(LanguageText.newInstance(lw), to);
-
-		if(res instanceof SuccessfulTranslationDescription)
-		{
-			translatedWords.get().put(lw, ((SuccessfulTranslationDescription)res).getTranslatedText());
-			//if(translatedWords.get().size()%10==0)
-			translatedWords.doAndUpdate(x->{});
-		}
-		return res;
-	}
-
-	public static Set<TranslationDescription> getAllTranslations(LanguageWord word, LanguageCode to) {
-		if(word.getWord().equals("ansågs"))
-			System.out.println();
-		TranslationDescription googleTranslation = getGoogleTranslation(word, to);
-		Set<TranslationDescription> babLaTranslations = BabLaProcessing.getBabLaTranslationDescriptions(word,to);
-		Set<TranslationDescription> wordReferenceTranslation = getWordReferenceTranslation(word,to);
+	
+	public static ResultOfTranslationAttempt getGoogleTranslation(LanguageText input, LanguageCode translateTo, boolean cached) {
+		if(input.isSingleWord())
+			return getGoogleTranslation(input.toSingleWord());
 		
-		Set<TranslationDescription> res = new HashSet<>();
-		if(googleTranslation instanceof SuccessfulTranslationDescription)
-			res.add(googleTranslation);
-		res.addAll(babLaTranslations);
-		res.addAll(wordReferenceTranslation);
+		if(textTranslationCache.has(input))
+			return SuccessfulTranslationDescription.newInstance(textTranslationCache.get(input), "", WordType.UNDEFINED, Origin.GOOGLE);
+		
+		ResultOfTranslationAttempt res =  getOutcomeOfGoogleTranslation(input, translateTo); 
+		
+		if(res instanceof SuccessfulTranslationDescription)	
+			textTranslationCache.add(input, ((SuccessfulTranslationDescription)res).getTranslatedText());
 		return res;
 	}
 
+	public static ResultOfTranslationAttempt getGoogleTranslation(LanguageWord lw) {
+		synchronized(lw)
+		{
+			if(translatedGoogleWords.has(lw))
+				return SuccessfulTranslationDescription
+						.newInstance(translatedGoogleWords.get(lw), "",
+								WordType.UNDEFINED, discordforrad.models.language.ResultOfTranslationAttempt.Origin.GOOGLE);
+			ResultOfTranslationAttempt res = getOutcomeOfGoogleTranslation(LanguageText.newInstance(lw), LanguageCode.otherLanguage(lw.getCode()));
 
-	public static Set<TranslationDescription> getWordReferenceTranslation(LanguageWord word, LanguageCode to) {
-		return getWordReferenceTranslationsFrom(word, to).stream()
+			if(res instanceof SuccessfulTranslationDescription)
+			{
+				translatedGoogleWords.add(lw, ((SuccessfulTranslationDescription)res).getTranslatedText());
+			}
+			
+			return res;
+		}
+	}
+
+
+	public static Set<ResultOfTranslationAttempt> getResultOfTranslationAttempts(LanguageWord word) {
+		synchronized (word) {
+			if(translationAttemptsCache.has(word))
+			{
+				Set<ResultOfTranslationAttempt> res = new HashSet<>();
+				res.addAll(translationAttemptsCache.get(word));
+			//	res.addAll(BabLaProcessing.getBabLaTranslationDescriptions(word));
+			//	res.add(getGoogleTranslation(word));
+				
+				
+				return translationAttemptsCache.get(word).stream().collect(Collectors.toSet());
+			}
+
+
+			ResultOfTranslationAttempt googleTranslation = getGoogleTranslation(word);
+			Set<ResultOfTranslationAttempt> babLaTranslations = BabLaProcessing.getBabLaTranslationDescriptions(word);
+			Set<ResultOfTranslationAttempt> wordReferenceTranslation = getWordReferenceTranslation(word);
+
+			Set<ResultOfTranslationAttempt> res = new HashSet<>();
+			res.add(googleTranslation);
+			res.addAll(babLaTranslations);
+			res.addAll(wordReferenceTranslation);
+
+			translationAttemptsCache.add(word,res.stream().collect(Collectors.toList()));
+			return res;
+		}
+	}
+
+
+	public static Set<ResultOfTranslationAttempt> getWordReferenceTranslation(LanguageWord word) {
+		return getWordReferenceTranslationsFrom(word, LanguageCode.otherLanguage(word.getCode())).stream()
 				.collect(Collectors.toSet());
 	}
 
-	public static Set<TranslationDescription> getWordReferenceTranslationsFrom(LanguageWord lw,
+	public static Set<ResultOfTranslationAttempt> getWordReferenceTranslationsFrom(LanguageWord lw,
 			LanguageCode to) {
 		DatabaseProcessingOutcome outcome = WebScrapping.getContentsFrom(lw, DataBaseEnum.WORD_REFERENCE);
 		String wrInput = ((SingleEntryWebScrapping)outcome).get();
 
 
 		boolean shouldContinue = true;
-		Set<TranslationDescription>res = new HashSet<>();
-		
+		Set<ResultOfTranslationAttempt>res = new HashSet<>();
+
 		while(shouldContinue)
 		{
-			
+
 			if(wrInput==null)
 				throw new Error();
 
@@ -219,6 +300,64 @@ public class Translator {
 							lastLeftTranslation = lastLeftTranslation.substring(1);
 						while(lastLeftTranslation.contains("  "))
 							lastLeftTranslation=lastLeftTranslation.replaceAll("  ", " ");
+
+						if(lastLeftTranslation.contains(", also "))
+							lastLeftTranslation = lastLeftTranslation.substring(0,lastLeftTranslation.indexOf(", also "));
+
+
+						if(lastLeftTranslation.contains("<a")&&!lastLeftTranslation.startsWith("<a"))
+						{
+							lastLeftTranslation = lastLeftTranslation
+									.substring(0, lastLeftTranslation.indexOf("<a")).trim();
+						}
+
+						if(lastLeftTranslation.contains("</a>"))
+						{
+							lastLeftTranslation = 
+									lastLeftTranslation.substring(lastLeftTranslation.indexOf("</a>")+4).trim();
+
+							if(lastLeftTranslation.contains("<a")&&!lastLeftTranslation.startsWith("<a"))
+							{
+								lastLeftTranslation = lastLeftTranslation
+										.substring(0, lastLeftTranslation.indexOf("<a")).trim();
+							}
+						}
+						if(lastLeftTranslation.contains(", plural"))
+							lastLeftTranslation = lastLeftTranslation.substring(0,lastLeftTranslation.indexOf(", plural"))
+							.trim();
+						if(lastLeftTranslation.contains(", pl:"))
+							lastLeftTranslation = lastLeftTranslation.substring(0,lastLeftTranslation.indexOf(", pl:"))
+							.trim();
+
+						if(lastLeftTranslation.contains(", f:"))
+							lastLeftTranslation = lastLeftTranslation.substring(0,lastLeftTranslation.indexOf(", f:"))
+							.trim();
+
+						if(lastLeftTranslation.contains(", replacce:"))
+							lastLeftTranslation = lastLeftTranslation.substring(0,lastLeftTranslation.indexOf(", replacce:"))
+							.trim();
+
+						if(lastLeftTranslation.contains(", UK:"))
+							lastLeftTranslation = lastLeftTranslation.substring(0,lastLeftTranslation.indexOf(", UK:"))
+							.trim();
+						if(lastLeftTranslation.contains("also UK:"))
+							lastLeftTranslation = lastLeftTranslation.substring(0,lastLeftTranslation.indexOf("also UK:"))
+							.trim();
+						if(lastLeftTranslation.contains(", US:"))
+							lastLeftTranslation = lastLeftTranslation.substring(0,lastLeftTranslation.indexOf(", US:"))
+							.trim();
+
+						if(lastLeftTranslation.toLowerCase().startsWith("re:"))
+							continue;
+
+						if(lastLeftTranslation.toLowerCase().contains(", rare:"))
+							lastLeftTranslation = lastLeftTranslation.substring(0,lastLeftTranslation.indexOf(", rare:"))
+							.trim();
+
+						if(lastLeftTranslation.contains(":"))
+							throw new Error();
+
+						lastLeftTranslation = lastLeftTranslation.trim();
 
 						currentTypeLeft = WordDescription.getWordTypeOf(split);
 						/*while(lastLeftTranslation.contains("<span"))
@@ -289,21 +428,36 @@ public class Translator {
 
 
 						for(String rightTranslation:rightTranslations)
-							if(lw.equals(LanguageWord.newInstance(lastLeftTranslation, languageCodeLeftTable)))
+						{
+							if(lastLeftTranslation.toLowerCase().startsWith("re:"))continue;
+							if(lastLeftTranslation.isBlank())continue;
+							if(lw.equals(LanguageWord.newInstance(lastLeftTranslation.replaceAll("-", ""), languageCodeLeftTable)))
 							{
+								rightTranslation = rightTranslation.replaceAll("\n", "").replaceAll("\t", "").replaceAll("\r", "");
+								while(rightTranslation.contains("  ")){rightTranslation = rightTranslation.replaceAll("  ", " ");}
+								if(rightTranslation.equals("-"))continue;
+								if(rightTranslation.equals("--"))continue;
+								if(rightTranslation.isBlank())continue;
+								if(lastLeftTranslation.isBlank()) continue;
 								res.add(SuccessfulTranslationDescription.newInstance(
 										LanguageText.newInstance(languageCodeRightTable, rightTranslation),
 										lastLeftComplementaryTranslation+" "+lastRightComplementaryTranslation,
 										currentTypeRight,
 										SuccessfulTranslationDescription.Origin.WORD_REFERENCE));
 							}
+						}
 
 						for(String localTranslation:rightTranslations)
 						{
+							if(localTranslation.contains(":"))continue;
+
 							localTranslation = localTranslation.replaceAll("!", "").trim();
 							while(localTranslation.startsWith("-")) localTranslation = localTranslation.substring(1);
+							localTranslation = localTranslation.trim();
+							if(localTranslation.isEmpty())continue;
 							if(lw.equals(LanguageWord.newInstance(localTranslation, languageCodeRightTable)))
 							{
+								if(lastLeftTranslation.isBlank())continue;
 								res.add(SuccessfulTranslationDescription.newInstance(LanguageText.newInstance(languageCodeLeftTable,lastLeftTranslation), 
 										lastLeftComplementaryTranslation+lastRightComplementaryTranslation,
 										currentTypeLeft, SuccessfulTranslationDescription.Origin.WORD_REFERENCE));
@@ -357,7 +511,7 @@ public class Translator {
 
 				 */
 			}
-			
+
 			shouldContinue = false;
 
 			if(wrInput.contains("Matchande uppslagsord från andra sidan av ordboken."))
@@ -371,24 +525,20 @@ public class Translator {
 
 	public static String getNiceTranslationString(LanguageWord lw, boolean multiLine) {
 		String translationText="";
-		
-		
-		Set<TranslationDescription> translations = getAllTranslations(lw, LanguageCode.otherLanguage(lw.getCode()));
-		
+
+		Set<ResultOfTranslationAttempt> translations = getResultOfTranslationAttempts(lw);
+
 		Set<SuccessfulTranslationDescription> successfulTranslations = translations.stream().filter(x->x instanceof SuccessfulTranslationDescription)
 				.map(x->(SuccessfulTranslationDescription)x).collect(Collectors.toSet());
 
-		Map<LanguageText, Set<TranslationDescription.Origin>> countPerTranslation = new HashMap<>();
-		for(SuccessfulTranslationDescription td: successfulTranslations)
-		{
-			if(! countPerTranslation.containsKey(td.getTranslatedText()))
-				countPerTranslation.put(td.getTranslatedText(), new HashSet<>());
-			countPerTranslation.get(td.getTranslatedText()).add(td.getOriginOfTranslation());
-		}
+		Map<LanguageText, Set<ResultOfTranslationAttempt.Origin>> countPerTranslation = 
+				getOriginsPerTranslation(lw);
+		
+		
+		
+		List<LanguageText> textSortedByNumberOfOccurrences = 
+				getTranslationSortedByNumberOfOrigins(lw);
 
-		List<LanguageText> textSortedByNumberOfOccurrences = countPerTranslation.keySet().stream()
-				.sorted((x,y)->-Integer.compare(countPerTranslation.get(x).size(), countPerTranslation.get(y).size()))
-				.collect(Collectors.toList());
 
 		for(LanguageText currentText:textSortedByNumberOfOccurrences)
 		{
@@ -412,54 +562,131 @@ public class Translator {
 			if(allTypes.size() == 1) officialType = allTypes.iterator().next();*/
 			String typeString = allTypes.toString();
 			translationText+=currentText.getText();
-			if(multiLine)translationText+=" "+typeString.substring(1,typeString.length()-1);
 			for(String advanced : translationOfTheCurrentTextWithAdvancedDescription)
-				translationText=translationText + " "+advanced;
-			if(multiLine)translationText+=" ("+countPerTranslation.get(currentText)+")";
+				translationText=translationText + " "+advanced+" ";
+
+			//if(currentText.isSingleWord())
+			//	{
+			
+			List<LanguageText> words = getTranslationSortedByNumberOfOrigins(currentText,true);
+			/*LanguageWord mostSuitedTranslation = 
+			ResultOfTranslationAttempt translate=Translator.getGoogleTranslation(
+					currentText, LanguageCode.otherLanguage(currentText.getLanguageCode()),true);*/ 
+			
+			String googleText = "";
+			if(words.isEmpty())
+			{
+				googleText = "NO TRANSLATION FOR THIS WORD";
+				getTranslationSortedByNumberOfOrigins(currentText,true);
+			}
+			else 
+				googleText = words.get(0).toString();
+			translationText+=" --"+googleText;
+			//}
+			//else {translationText}
+
+			if(multiLine)translationText+=" "+typeString.substring(1,typeString.length()-1);
+
+			if(multiLine)translationText+=" "+countPerTranslation.get(currentText)+"";
 			if(multiLine)translationText+="\n";
 			else translationText+=" ";
-			
+
 			/*for(TranslationDescription currentDescription:translations))
 			{
 				translationText+=s+"\n";
 			}*/
 		}
-		
+
 		if(! multiLine) translationText = translationText.replaceAll("  ", " ");
-		
+
 		return translationText;
 	}
 
+	private static List<LanguageText> getTranslationSortedByNumberOfOrigins(LanguageText lt,
+			boolean cached) 
+	{
+		if(lt.isSingleWord())
+		{
+			return getTranslationSortedByNumberOfOrigins(lt.toSingleWord());
+		}
+		else
+		{
+			ResultOfTranslationAttempt to = getGoogleTranslation(
+					lt,
+					LanguageCode.otherLanguage(lt.getLanguageCode()),
+					cached);
+			
+			List<LanguageText> res = new ArrayList<>();
+			if(to instanceof SuccessfulTranslationDescription)
+				res.add(((SuccessfulTranslationDescription)to).getTranslatedText());
+			return res;
+		}
+	}
+
+	private static List<LanguageText> getTranslationSortedByNumberOfOrigins(LanguageWord lw) {
+		
+		Map<LanguageText, Set<ResultOfTranslationAttempt.Origin>> countPerTranslation = 
+				getOriginsPerTranslation(lw);
+
+		return countPerTranslation.keySet().stream()
+				.sorted((x,y)->-Integer.compare(countPerTranslation.get(x).size(), countPerTranslation.get(y).size()))
+				.collect(Collectors.toList());
+	}
+
+	private static Map<LanguageText, Set<Origin>> getOriginsPerTranslation(LanguageWord lw) {
+		Set<ResultOfTranslationAttempt> translations = getResultOfTranslationAttempts(lw);
+
+		Set<SuccessfulTranslationDescription> successfulTranslations = translations.stream().filter(x->x instanceof SuccessfulTranslationDescription)
+				.map(x->(SuccessfulTranslationDescription)x).collect(Collectors.toSet());
+
+		Map<LanguageText, Set<ResultOfTranslationAttempt.Origin>> countPerTranslation = 				new HashMap<>();
+		for(SuccessfulTranslationDescription td: successfulTranslations)
+		{
+			if(! countPerTranslation.containsKey(td.getTranslatedText()))
+				countPerTranslation.put(td.getTranslatedText(), new HashSet<>());
+			countPerTranslation.get(td.getTranslatedText()).add(td.getOriginOfTranslation());
+		}
+		
+		return countPerTranslation;
+	}
+
+	private static final Map<LanguageWord, Set<LanguageWord>> translationPerWord = new ConcurrentHashMap<>();
 	public static Set<LanguageWord> getTranslationsOf(LanguageWord lw) {
-		Set<TranslationDescription> translations = 
-				Translator.getAllTranslations(lw, LanguageCode.otherLanguage(lw.getCode()));
+		if(translationPerWord.containsKey(lw))
+			return translationPerWord.get(lw);
+		Set<ResultOfTranslationAttempt> translations = 
+				Translator.getResultOfTranslationAttempts(lw);
 		Set<LanguageWord> alternatives = 
 				translations.stream()
+				.filter(x->x instanceof SuccessfulTranslationDescription)
 				.map(x->((SuccessfulTranslationDescription)x))
 				.map(x->x.getTranslatedText())
 				.filter(x->x.getListOfValidWords().size()==1)
 				.map(x->x.getListOfValidWords().get(0)).collect(Collectors.toSet());
+
+
+		translationPerWord.put(lw, alternatives);
 		return alternatives;
 	}
 
 	public static Set<LanguageWord> getTranslationsOfTranslations(LanguageWord lw) {
 		return getTranslationsOf(lw).stream().map(x->getTranslationsOf(x))
-		.reduce(new HashSet<>(), (x,y)->{x.addAll(y);return x;});
+				.reduce(new HashSet<>(), (x,y)->{x.addAll(y);return x;});
 	}
 
 	public static boolean hasTranslationOrAGrundformRelatedTranslationThatIsNotFromGoogle(LanguageWord x) {
 		Set<LanguageWord> allForms = new HashSet<>();
 		allForms.add(x);
 		allForms.addAll(WordDescription.getGrundforms(x));
-		
-		Set<TranslationDescription> translation = 
-				allForms.stream().map(y->Translator.getAllTranslations(y, LanguageCode.otherLanguage(y.getCode())))
+
+		Set<ResultOfTranslationAttempt> translation = 
+				allForms.stream().map(y->Translator.getResultOfTranslationAttempts(y))
 				.reduce(new HashSet<>(), (z,y)->{z.addAll(y); return z;});
-		
+
 		boolean res = translation.stream().filter(y->y instanceof SuccessfulTranslationDescription)
 				.map(y->(SuccessfulTranslationDescription)y)
 				.anyMatch(y->!y.getOrigin().equals(Origin.GOOGLE));
-							
+
 		return res;
 	}
 

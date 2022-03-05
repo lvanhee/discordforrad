@@ -16,13 +16,12 @@ import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
-
 import cachingutils.SplittedFileBasedCache;
-import discordforrad.LanguageCode;
 import discordforrad.Main;
 import discordforrad.inputUtils.WebScrapping.DataBaseEnum;
 import discordforrad.inputUtils.databases.BabLaProcessing;
 import discordforrad.inputUtils.databases.WordReferenceDBManager;
+import discordforrad.models.LanguageCode;
 import discordforrad.models.language.LanguageWord;
 import discordforrad.models.language.wordnetwork.forms.SingleEntryWebScrapping;
 import webscrapping.RobotBasedPageReader;
@@ -54,8 +53,8 @@ public class WebScrapping {
 		String cacheFolder = "\\"+db.name()+"\\";
 
 		String cacheFileName = Main.ROOT_DATABASE+CACHE_FILEPATH.toString()
-				+cacheFolder
-				+lw.toString().replaceAll(":", "")+".html";
+		+cacheFolder
+		+lw.toString().replaceAll(":", "")+".html";
 
 		return new File(cacheFileName);
 	}
@@ -69,6 +68,7 @@ public class WebScrapping {
 
 
 
+	private static final Object lockBabLaCalls = "BabLaLock";
 	private static boolean hasWordReferenceFailed = false;
 	public static DatabaseProcessingOutcome getContentsFrom(LanguageWord lw, DataBaseEnum db) {
 		if(hasWordReferenceFailed &&db.equals(DataBaseEnum.WORD_REFERENCE))
@@ -77,10 +77,10 @@ public class WebScrapping {
 		lw  =LanguageWord.newInstance("katt", LanguageCode.SV);*/
 		Set<String> pageToAskFor = new HashSet<>();
 		final DbLwPair inputPair = DbLwPair.newInstance(db, lw);
-		
+
 		if(!isPossibleEntryFor(lw,db))
 			throw new Error();
-		
+
 		if(cache.has(inputPair))
 		{
 			String content = cache.get(inputPair);
@@ -94,7 +94,7 @@ public class WebScrapping {
 			}
 			else return processToOutcomes(cache.get(inputPair),x->WebScrapping.isValidlyProcessedRequest(db, x,lw));
 		}
-		
+
 		switch(db)
 		{
 		case WORD_REFERENCE:pageToAskFor.add("https://" + getWordReferenceWebPageName(lw)+lw.getWord()); break;
@@ -136,7 +136,7 @@ public class WebScrapping {
 		}
 
 
-		
+
 
 
 
@@ -153,22 +153,46 @@ public class WebScrapping {
 							case BAB_LA:
 								String r = null;
 								boolean hasBeenTriedOnceAlready = false;
-								do
-								{
-									if(hasBeenTriedOnceAlready)
-										BabLaProcessing.increaseProcessingTime();
-									else
-										BabLaProcessing.decreaseProcessingTime();
-									r = RobotBasedPageReader.getFullPageAsHtml(x,BabLaProcessing.getProcessingSpeedFactor());
-									
-								}
-								while(!BabLaProcessing.isValidlyProcessedRequest(r, lw));
+							//	synchronized (lockBabLaCalls) {
+									do
+									{
+										//String tmp = 
+										
+										System.out.println(x);
+										
+									//	System.out.println(tmp);
+										
+										r = WebpageReader.getWebclientWebPageContents(x);
+										if(r.equals("NO_PAGE_TO_BE_SERVED"))return r;
+										while(r.contains("\n "))
+											r = r.replaceAll("\n ", "\n");
+										r = r.replaceAll("\n", "");
+										r = r.replaceAll("\r", "");
+											//	RobotBasedPageReader.getFullPageAsHtml(x,BabLaProcessing.getProcessingSpeedFactor());
+										//System.out.println(r);
+										if(r.contains("<title>English-Swedish dictionary - translation - bab.la</title>")
+												||r.contains("<title>Swedish-English dictionary - translation - bab.la</title>"))
+											return "NO_PAGE_TO_BE_SERVED";
+										//	r = RobotBasedPageReader.getFullPageAsHtml(x,BabLaProcessing.getProcessingSpeedFactor());
+										hasBeenTriedOnceAlready = true;
+										boolean wasRequestSuccessful =BabLaProcessing.isValidlyProcessedRequest(r, lw);
+										if(!wasRequestSuccessful) {
+											BabLaProcessing.increaseProcessingTime();
+										}
+										else
+											BabLaProcessing.decreaseProcessingTime();
+									}
+
+
+									while(!BabLaProcessing.isValidlyProcessedRequest(r, lw));
+								//}
 								return startOfPageHtmlHeader+r;
 							default:
 								throw new Error();
 							}
 						}
 						)
+				.filter(x->!x.equals("NO_PAGE_TO_BE_SERVED"))
 				/*.filter(x->
 				{
 					if(db.equals(DataBaseEnum.SO))
@@ -191,25 +215,29 @@ public class WebScrapping {
 			}
 			return FailedDatabaseProcessingOutcome.FAILED;
 		}
-		
-		cache.add(inputPair,entries);
-		 
+
+		synchronized(cache)
+		{ 
+			if(!cache.has(inputPair))
+				cache.add(inputPair,entries);
+		}
+
 		return processToOutcomes(entries, x->WebScrapping.isValidlyProcessedRequest(db, x,lw));
 	}
 
 	private static DatabaseProcessingOutcome processToOutcomes(String entry, Predicate<String> checker) {
 		if(! entry.contains("<!--!!!START_OF_PAGE "))return SingleEntryWebScrapping.newInstance(entry);
 		List<String> entries = Arrays.asList(entry.split("<!--!!!START_OF_PAGE "));
-		
+
 		Set<String> res = entries
 				.stream()
 				.filter(x->!x.isBlank())
 				.filter(checker)
 				.collect(Collectors.toSet());
-		
+
 		if(res.size()==0)
 			return FailedDatabaseProcessingOutcome.FAILED;
-			
+
 		if(res.size()==1) 
 			return SingleEntryWebScrapping.newInstance(res.iterator().next());
 		return  EntriesFoundWebscrappingOutcome.newInstance(res);
@@ -219,13 +247,13 @@ public class WebScrapping {
 		if(db.equals(DataBaseEnum.WORD_REFERENCE)
 				&&!WordReferenceDBManager.isContentOfSuccessfullyLoadedPage(content))
 			return false;
-		
+
 		if(db.equals(DataBaseEnum.BAB_LA))
 			return BabLaProcessing.isValidlyProcessedRequest(content,lw);
-		
+
 		if(content.equals("FAILED TO LOAD"))
 			return false;
-		
+
 		return true;
 	}
 
@@ -252,10 +280,10 @@ public class WebScrapping {
 		DatabaseProcessingOutcome contents = WebScrapping.getContentsFrom(lw,db);
 
 		if(contents instanceof NotFoundWebscrappingOutcome)return false;
-		
+
 		if(contents instanceof SingleEntryWebScrapping)
 			return isInDatabaseFromText(((SingleEntryWebScrapping)contents).get(), lw, db);
-		
+
 		Set<String> entries = ((EntriesFoundWebscrappingOutcome)contents).getEntries();
 
 		for(String s: entries)
