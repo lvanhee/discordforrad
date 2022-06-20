@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import discordforrad.discordmanagement.DiscordFontedString;
@@ -21,20 +22,20 @@ import discordforrad.discordmanagement.audio.LocalAudioDatabase;
 import discordforrad.discordmanagement.audio.LocalAudioPlayer;
 import discordforrad.inputUtils.UserLearningTextManager;
 import discordforrad.inputUtils.TextInputUtils;
-import discordforrad.models.LanguageCode;
-import discordforrad.models.LearningModel;
-import discordforrad.models.VocabularyLearningStatus;
-import discordforrad.models.VocabularyLearningStatus.LearningStatus;
 import discordforrad.models.language.Dictionnary;
+import discordforrad.models.language.LanguageCode;
 import discordforrad.models.language.LanguageText;
 import discordforrad.models.language.LanguageWord;
 import discordforrad.models.language.WordDescription;
+import discordforrad.models.learning.LearningModel;
+import discordforrad.models.learning.VocabularyLearningStatus;
+import discordforrad.models.learning.VocabularyLearningStatus.LearningStatus;
 import discordforrad.models.learning.focus.ReadThroughFocus;
 import discordforrad.models.learning.session.Session;
 import discordforrad.models.learning.session.WordSelectionAssessment;
 import discordforrad.translation.Translator;
 
-public enum DisOrdforrAI {
+public enum DiscOrdforrAI {
 	INSTANCE;
 
 	private final VocabularyLearningStatus vls;
@@ -42,7 +43,7 @@ public enum DisOrdforrAI {
 	private Session currentSession=null;
 
 	private LanguageWord lastWordAsked = null;
-	private DisOrdforrAI()
+	private DiscOrdforrAI()
 	{
 		try {
 			vls = VocabularyLearningStatus.loadFromFile();
@@ -56,6 +57,7 @@ public enum DisOrdforrAI {
 	public void processPostWordAttempt() {
 		if(currentSession.isSessionOver()) {			
 			DiscordManager.discussionChannel.sendMessage("No more words to ask for this session").queue();
+			vls.flushCaches();
 
 			for(LanguageText lt: currentFocus.getLanguageTextList())
 				discordforrad.discordmanagement.DiscordManager
@@ -159,7 +161,19 @@ public enum DisOrdforrAI {
 			
 			DiscordManager.print(WordSelectionAssessment.newInstance(currentSession.getAllUnknownWords(), vls, this.currentFocus).toString());
 		}
+		printFailedWords();
+		
+	}
 
+
+	private void printFailedWords() {
+		String failedWords = "\n\n***Hardest words***\n";
+		for(LanguageWord lw: vls.getMostFailedNotMasteredWords())
+		{
+			failedWords+=lw+" ||"+Translator.getTranslationsOf(lw).stream().map(x->x.getWord()).collect(Collectors.toSet())+"||\n";
+		}
+		
+		DiscordManager.print(failedWords);
 	}
 
 
@@ -267,8 +281,8 @@ public enum DisOrdforrAI {
 		Set<LanguageWord> mandatoryWordsToConsider = new HashSet<>();
 		mandatoryWordsToConsider.addAll(currentFocus.getAllValidWordsSortedByTheirOrderOfOccurrenceInFocusTexts());
 		mandatoryWordsToConsider.addAll(
-				mandatoryWordsToConsider.stream()
-				.map(x->Translator.getTranslationsOf(x)).reduce(new HashSet<>(), (x,y)->{x.addAll(y); return x;}));
+				mandatoryWordsToConsider.parallelStream()
+				.map(x->Translator.getTranslationsOf(x)).reduce(ConcurrentHashMap.newKeySet(), (x,y)->{x.addAll(y); return x;}));
 		
 		
 		

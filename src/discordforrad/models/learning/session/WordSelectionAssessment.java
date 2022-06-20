@@ -7,10 +7,10 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import discordforrad.inputUtils.UserLearningTextManager;
-import discordforrad.models.LanguageCode;
-import discordforrad.models.VocabularyLearningStatus;
+import discordforrad.models.language.LanguageCode;
 import discordforrad.models.language.LanguageWord;
 import discordforrad.models.language.WordDescription;
+import discordforrad.models.learning.VocabularyLearningStatus;
 import discordforrad.models.learning.focus.ReadThroughFocus;
 import discordforrad.translation.Translator;
 

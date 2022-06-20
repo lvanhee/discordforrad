@@ -24,20 +24,19 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import cachingutils.FileBasedStringSetCache;
-import cachingutils.PlainObjectFileBasedCache;
-import cachingutils.TextFileBasedCache;
+import cachingutils.impl.FileBasedStringSetCache;
+import cachingutils.impl.PlainObjectFileBasedCache;
+import cachingutils.impl.TextFileBasedCache;
 import discordforrad.Main;
 import discordforrad.inputUtils.TextInputUtils;
 import discordforrad.inputUtils.WebScrapping;
 import discordforrad.inputUtils.WebScrapping.DataBaseEnum;
 import discordforrad.inputUtils.databases.BabLaProcessing;
-import discordforrad.models.LanguageCode;
-import discordforrad.models.VocabularyLearningStatus;
 import discordforrad.models.language.wordnetwork.forms.RelatedForms;
 import discordforrad.models.language.wordnetwork.forms.RelatedFormsNetwork;
 import discordforrad.models.language.wordnetwork.forms.RelatedFormsTransition;
 import discordforrad.models.language.wordnetwork.forms.RelatedFormsTransitionImpl;
+import discordforrad.models.learning.VocabularyLearningStatus;
 import discordforrad.translation.Translator;
 import webscrapping.RobotBasedPageReader;
 import webscrapping.WebpageReader;
@@ -141,7 +140,7 @@ public class Dictionnary {
 	{	 
 		String pageToAskFor = "https://folkets-lexikon.csc.kth.se/folkets/"+'#'
 				+lw.getWord().replaceAll("_", "%20");
-		String webPageContents = WebpageReader.getWebclientWebPageContents(pageToAskFor);
+		String webPageContents = WebpageReader.getWebclientWebPageContents(pageToAskFor).toString();
 		System.out.println("----------------------");
 		System.out.println(webPageContents);
 		boolean result = !webPageContents.contains("automaträttades till")&&

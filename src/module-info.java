@@ -14,4 +14,5 @@ module discordforrad {
 	requires cachingutils;
 	requires java.desktop;
 	requires json.simple;
+
 }

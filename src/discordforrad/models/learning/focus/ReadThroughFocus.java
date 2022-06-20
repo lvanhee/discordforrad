@@ -18,9 +18,10 @@ import java.util.stream.Collectors;
 import discordforrad.Main;
 import discordforrad.inputUtils.UserLearningTextManager;
 import discordforrad.inputUtils.TextInputUtils;
-import discordforrad.models.LanguageCode;
+import discordforrad.models.language.LanguageCode;
 import discordforrad.models.language.LanguageText;
 import discordforrad.models.language.LanguageWord;
+import discordforrad.models.learning.VocabularyLearningStatus;
 
 public class ReadThroughFocus {
 	
@@ -101,5 +102,10 @@ public class ReadThroughFocus {
 
 	public boolean isInCurrentFocus(LanguageWord x) {
 		return allWordsInCurrentFocusCache.contains(x);
+	}
+
+	public Set<LanguageWord> getAllEarlyPhaseWordsExposableForLearning(VocabularyLearningStatus vls) {
+		return allWordsInCurrentFocusCache.stream().filter(x->vls.isEarlyPhaseWord(x)&&vls.isExposableForLearning(x))
+		.collect(Collectors.toSet());
 	}
 }

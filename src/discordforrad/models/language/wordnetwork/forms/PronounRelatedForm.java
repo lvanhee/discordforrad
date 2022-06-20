@@ -4,6 +4,8 @@ import java.io.Serializable;
 import java.util.Map;
 import java.util.Set;
 
+import org.json.simple.JSONObject;
+
 import discordforrad.models.language.LanguageWord;
 
 public class PronounRelatedForm implements RelatedForms, Serializable {
@@ -63,5 +65,10 @@ public class PronounRelatedForm implements RelatedForms, Serializable {
 	}
 	public boolean equals(Object o) {throw new Error();}
 	public int hashCode() {return form.hashCode();}
+
+	@Override
+	public JSONObject toJsonObject() {
+		throw new Error();
+	}
 
 }

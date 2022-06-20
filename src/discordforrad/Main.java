@@ -5,6 +5,7 @@ import java.io.IOException;
 import javax.security.auth.login.LoginException;
 
 import discordforrad.discordmanagement.DiscordManager;
+import discordforrad.inputUtils.databases.DatabaseFiller;
 import discordforrad.models.language.Dictionnary;
 
 
@@ -21,19 +22,19 @@ public class Main {
 	{
 	//	Translator.hasTranslationOrAGrundformRelatedTranslationThatIsNotFromGoogle(LanguageWord.newInstance("help", LanguageCode.EN));
 
-		DisOrdforrAI.INSTANCE.startNewSession();
-	/*	new Thread(()->{
+		DiscOrdforrAI.INSTANCE.startNewSession();
+		new Thread(()->{
 			try {
 				Thread.sleep(60000);
-				Dictionnary.main(args);
-			} catch (AWTException e) {
-				e.printStackTrace();
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			} catch (IOException e) {
+				DatabaseFiller.main(new String[0]);
+
+			} catch (InterruptedException | IOException e) {
+				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
-		}).start();*/
+
+		}).start();
 		DiscordManager.jda.addEventListener(new DiscordManager());
+
 	}
 }

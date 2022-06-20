@@ -1,21 +1,17 @@
 package discordforrad.discordmanagement.audio;
 
 import java.io.File;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import discordforrad.inputUtils.DatabaseProcessingOutcome;
+import cachingutils.advanced.failable.AttemptOutcome;
+import cachingutils.advanced.failable.FailedDatabaseProcessingOutcome;
+import cachingutils.advanced.failable.SuccessfulOutcome;
 import discordforrad.inputUtils.WebScrapping;
 import discordforrad.inputUtils.WebScrapping.DataBaseEnum;
-import discordforrad.inputUtils.databases.BabLaProcessing;
-import discordforrad.models.LanguageCode;
+import discordforrad.models.language.LanguageCode;
 import discordforrad.models.language.LanguageWord;
-import discordforrad.models.language.WordDescription;
-import discordforrad.models.language.wordnetwork.WordNetwork;
 import discordforrad.models.language.wordnetwork.forms.SingleEntryWebScrapping;
 import webscrapping.WebpageReader;
 
@@ -51,28 +47,35 @@ public class LocalAudioDatabase {
 	public static void getFluxFromBabLa(LanguageWord lw) {
 		if(getAudioFileFor(lw).exists())
 			return;
-		DatabaseProcessingOutcome result = WebScrapping.getContentsFrom(lw,DataBaseEnum.BAB_LA);
+		AttemptOutcome<Set<String>> result = WebScrapping.getContentsFrom(lw,DataBaseEnum.BAB_LA);
+		if(result instanceof FailedDatabaseProcessingOutcome)
+			return;
+		
 		String page = null;
-		if(result instanceof SingleEntryWebScrapping)
-			page = ((SingleEntryWebScrapping)result).get();
-		else throw new Error();
+		Set<String> outcomes = ((SuccessfulOutcome<Set<String>>)result).getResult();
+		if(outcomes.size()!=1)
+			throw new Error();
+		page = outcomes.iterator().next();
 
-		List<String> lines = 
-				Arrays.asList(page.split("\n"))
+		
+		page = page.replaceAll("&gt;", ">");
+
+		Set<String> lines = 
+				Arrays.asList(page.split("href=\"javascript:babTTS"))
 				.stream()
 				.filter(x->x.contains(".mp3"))
-				.map(x->x.substring(x.indexOf("https://")))
-				.collect(Collectors.toList());
+				.map(x->x.substring(x.indexOf("https://"),x.indexOf(">")))						
+				.collect(Collectors.toSet());
 
 		lines.forEach(x->
 		{
 			String URL = x.substring(0,x.indexOf(".mp3")+4);
 			String next = x.substring(x.indexOf(".mp3")+5);
-			String nextName = next.substring(next.indexOf("'")+1);
-			nextName = nextName.replaceAll("\\\\'", "")
+			String wordAttachedToTheFile = next.substring(next.indexOf("'")+1);
+			wordAttachedToTheFile = wordAttachedToTheFile.replaceAll("\\\\'", "")
 					.replaceAll("-", "");
+			wordAttachedToTheFile = wordAttachedToTheFile.substring(0,wordAttachedToTheFile.indexOf("'")).trim();
 			
-			nextName = nextName.substring(0,nextName.indexOf("'")).trim();
 			LanguageCode language = null;
 			if(next.replaceAll(" ", "").contains("'en'"))
 				language = LanguageCode.EN;
@@ -80,13 +83,13 @@ public class LocalAudioDatabase {
 				language = LanguageCode.SV;
 			if(language==null)
 				throw new Error();
-			if(nextName.contains(":"))
+			if(wordAttachedToTheFile.contains(":"))
 			{
 				System.err.println("Issue getting the MP3");
 				return;
 			}
 			
-			File res =  getAudioFileFor(LanguageWord.newInstance(nextName, language));
+			File res =  getAudioFileFor(LanguageWord.newInstance(wordAttachedToTheFile, language));
 			if(!res.exists())
 				WebpageReader.downloadFileFrom(URL,res);
 		}

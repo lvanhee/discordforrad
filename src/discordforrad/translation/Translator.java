@@ -17,29 +17,34 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
-import cachingutils.TextFileBasedCache;
+import cachingutils.advanced.failable.AttemptOutcome;
+import cachingutils.advanced.failable.FailedDatabaseProcessingOutcome;
+import cachingutils.advanced.failable.RequestSuccessfulButNoMatchingEntries;
+import cachingutils.advanced.failable.SuccessfulOutcome;
+import cachingutils.impl.TextFileBasedCache;
 import discordforrad.Main;
-import discordforrad.inputUtils.DatabaseProcessingOutcome;
 import discordforrad.inputUtils.TextInputUtils;
 import discordforrad.inputUtils.WebScrapping;
 import discordforrad.inputUtils.WebScrapping.DataBaseEnum;
 import discordforrad.inputUtils.databases.BabLaProcessing;
-import discordforrad.models.LanguageCode;
+import discordforrad.models.language.LanguageCode;
 import discordforrad.models.language.LanguageText;
 import discordforrad.models.language.LanguageWord;
-import discordforrad.models.language.SuccessfulTranslationDescription;
 import discordforrad.models.language.WordDescription;
-import discordforrad.models.language.ResultOfTranslationAttempt;
-import discordforrad.models.language.ResultOfTranslationAttempt.Origin;
 import discordforrad.models.language.WordDescription.WordType;
 import discordforrad.models.language.wordnetwork.forms.SingleEntryWebScrapping;
+import discordforrad.translation.ResultOfTranslationAttempt.Origin;
 
 public class Translator {
 
 
 	private static final File PATH_TO_GOOGLE_TRANSLATE_CACHE = new File(Main.ROOT_DATABASE+"databases/known_google_translate_word_translations.txt");
-
-	private static final TextFileBasedCache<LanguageWord, LanguageText> translatedGoogleWords=
+	private static final File PATH_TO_TRANSLATION_CACHE = new File(Main.ROOT_DATABASE+"caches/already_computed_translations.txt");
+	private static final File PATH_TO_WR_TRANSLATION_CACHE = new File(Main.ROOT_DATABASE+"databases/word_reference_translations.txt");
+	private static final File PATH_TO_SENTENCE_TRANSLATION_CACHE = new File(Main.ROOT_DATABASE+"databases/google_translated_sentences_database.txt");
+	
+	
+	private static final TextFileBasedCache<LanguageWord, LanguageText> successfullyTranslatedGoogleWords=
 			TextFileBasedCache.newInstance(
 					PATH_TO_GOOGLE_TRANSLATE_CACHE,
 					i->i.toString(),
@@ -47,15 +52,23 @@ public class Translator {
 					o->o.toString(),
 					LanguageText::parse,"\t");
 
-	private static final File PATH_TO_TRANSLATION_CACHE = new File(Main.ROOT_DATABASE+"caches/already_computed_translations.txt");
-	private static final File PATH_TO_SENTENCE_TRANSLATION_CACHE = new File(Main.ROOT_DATABASE+"databases/google_translated_sentences_database.txt");
+
 
 	private static final TextFileBasedCache<LanguageWord, List<ResultOfTranslationAttempt>> translationAttemptsCache=
 			TextFileBasedCache.newInstance(
 					PATH_TO_TRANSLATION_CACHE,
 					i->i.toString(),
 					LanguageWord::parse,
-					o->{if(o.isEmpty()) return ""; else return o.stream().map(x->x.toParsableString()).reduce("",(x,y)->x+";"+y).substring(1);},
+					o->{if(o.isEmpty()) return "[]"; else return o.stream().map(x->x.toParsableString()).reduce("",(x,y)->x+";"+y).substring(1);},
+					ResultOfTranslationAttempt::parseList,"\t");
+	
+	
+	private static final TextFileBasedCache<LanguageWord, List<ResultOfTranslationAttempt>> wordReferenceTranslationAttemptsCache=
+			TextFileBasedCache.newInstance(
+					PATH_TO_WR_TRANSLATION_CACHE,
+					i->i.toString(),
+					LanguageWord::parse,
+					o->{if(o.isEmpty()) return "[]"; else return o.stream().map(x->x.toParsableString()).reduce("",(x,y)->x+";"+y).substring(1);},
 					ResultOfTranslationAttempt::parseList,"\t");
 	
 	private static final TextFileBasedCache<LanguageText, LanguageText> textTranslationCache=
@@ -77,7 +90,7 @@ public class Translator {
 		
 		assert(!originalText.getLanguageCode().equals(langTo));
 		if(cacheFailedTooManyAttemptsGoogle)
-			return TranslationOutcomeFailure.newInstance(discordforrad.models.language.ResultOfTranslationAttempt.Origin.GOOGLE);
+			return TranslationOutcomeFailure.newInstance(discordforrad.translation.ResultOfTranslationAttempt.Origin.GOOGLE);
 		String text = originalText.getText();
 		if(text.length()>1900) return TranslationOutcomeFailure.newInstance(Origin.GOOGLE);
 		try {
@@ -132,7 +145,7 @@ public class Translator {
 						}
 					   // System.exit(0);
 					}
-					return TranslationOutcomeFailure.newInstance(discordforrad.models.language.ResultOfTranslationAttempt.Origin.GOOGLE);
+					return TranslationOutcomeFailure.newInstance(discordforrad.translation.ResultOfTranslationAttempt.Origin.GOOGLE);
 				}
 
 				try {Thread.sleep(1000);} catch (InterruptedException e) {e.printStackTrace();}
@@ -175,15 +188,15 @@ public class Translator {
 	public static ResultOfTranslationAttempt getGoogleTranslation(LanguageWord lw) {
 		synchronized(lw)
 		{
-			if(translatedGoogleWords.has(lw))
+			if(successfullyTranslatedGoogleWords.has(lw))
 				return SuccessfulTranslationDescription
-						.newInstance(translatedGoogleWords.get(lw), "",
-								WordType.UNDEFINED, discordforrad.models.language.ResultOfTranslationAttempt.Origin.GOOGLE);
+						.newInstance(successfullyTranslatedGoogleWords.get(lw), "",
+								WordType.UNDEFINED, discordforrad.translation.ResultOfTranslationAttempt.Origin.GOOGLE);
 			ResultOfTranslationAttempt res = getOutcomeOfGoogleTranslation(LanguageText.newInstance(lw), LanguageCode.otherLanguage(lw.getCode()));
 
 			if(res instanceof SuccessfulTranslationDescription)
 			{
-				translatedGoogleWords.add(lw, ((SuccessfulTranslationDescription)res).getTranslatedText());
+				successfullyTranslatedGoogleWords.add(lw, ((SuccessfulTranslationDescription)res).getTranslatedText());
 			}
 			
 			return res;
@@ -193,28 +206,29 @@ public class Translator {
 
 	public static Set<ResultOfTranslationAttempt> getResultOfTranslationAttempts(LanguageWord word) {
 		synchronized (word) {
+			Set<ResultOfTranslationAttempt> res = new HashSet<>();
 			if(translationAttemptsCache.has(word))
 			{
-				Set<ResultOfTranslationAttempt> res = new HashSet<>();
 				res.addAll(translationAttemptsCache.get(word));
 			//	res.addAll(BabLaProcessing.getBabLaTranslationDescriptions(word));
 			//	res.add(getGoogleTranslation(word));
 				
-				
-				return translationAttemptsCache.get(word).stream().collect(Collectors.toSet());
+				if(!res.stream().anyMatch(x->x instanceof TranslationOutcomeFailure))
+					return res;
+				res = res.stream().filter(x->!(x instanceof TranslationOutcomeFailure)).collect(Collectors.toSet());
 			}
-
 
 			ResultOfTranslationAttempt googleTranslation = getGoogleTranslation(word);
 			Set<ResultOfTranslationAttempt> babLaTranslations = BabLaProcessing.getBabLaTranslationDescriptions(word);
 			Set<ResultOfTranslationAttempt> wordReferenceTranslation = getWordReferenceTranslation(word);
 
-			Set<ResultOfTranslationAttempt> res = new HashSet<>();
+			
 			res.add(googleTranslation);
 			res.addAll(babLaTranslations);
 			res.addAll(wordReferenceTranslation);
 
-			translationAttemptsCache.add(word,res.stream().collect(Collectors.toList()));
+			
+			translationAttemptsCache.addOrReplace(word,res.stream().collect(Collectors.toList()));
 			return res;
 		}
 	}
@@ -227,9 +241,39 @@ public class Translator {
 
 	public static Set<ResultOfTranslationAttempt> getWordReferenceTranslationsFrom(LanguageWord lw,
 			LanguageCode to) {
-		DatabaseProcessingOutcome outcome = WebScrapping.getContentsFrom(lw, DataBaseEnum.WORD_REFERENCE);
-		String wrInput = ((SingleEntryWebScrapping)outcome).get();
-
+		
+		if(wordReferenceTranslationAttemptsCache.has(lw))
+		{
+			Set<ResultOfTranslationAttempt>res = wordReferenceTranslationAttemptsCache.get(lw)
+					.stream()
+					.collect(Collectors.toSet());
+			if(res.stream().anyMatch(x->(x instanceof TranslationOutcomeFailure)))
+				throw new Error();
+			return res;
+		}
+		
+		AttemptOutcome outcome = WebScrapping.getContentsFrom(lw, DataBaseEnum.WORD_REFERENCE);
+		if(outcome instanceof FailedDatabaseProcessingOutcome)
+		{
+			Set<ResultOfTranslationAttempt> res =  Arrays.asList(TranslationOutcomeFailure.newInstance(Origin.WORD_REFERENCE))
+					.stream().collect(Collectors.toSet());
+		//	wordReferenceTranslationAttemptsCache.add(lw, res.stream().collect(Collectors.toList()));
+			
+			return res;
+		}
+		
+		if(outcome instanceof SuccessfulOutcome && ((SuccessfulOutcome<Set>)outcome).getResult().isEmpty())
+		{
+			Set<ResultOfTranslationAttempt> res = Arrays.asList(NoTranslationForTheRequest.newInstance(Origin.WORD_REFERENCE))
+					.stream().collect(Collectors.toSet());
+			wordReferenceTranslationAttemptsCache.add(lw, res.stream().collect(Collectors.toList()));
+			return res;
+		}
+		
+		Set<String> possibleResults = ((SuccessfulOutcome<Set<String>>)outcome).getResult();
+		if(possibleResults.size()!=1)
+			throw new Error();
+		String wrInput = possibleResults.iterator().next();
 
 		boolean shouldContinue = true;
 		Set<ResultOfTranslationAttempt>res = new HashSet<>();
@@ -352,6 +396,9 @@ public class Translator {
 
 						if(lastLeftTranslation.toLowerCase().contains(", rare:"))
 							lastLeftTranslation = lastLeftTranslation.substring(0,lastLeftTranslation.indexOf(", rare:"))
+							.trim();
+						if(lastLeftTranslation.toLowerCase().contains(", singular:"))
+							lastLeftTranslation = lastLeftTranslation.substring(0,lastLeftTranslation.indexOf(", singular:"))
 							.trim();
 
 						if(lastLeftTranslation.contains(":"))
@@ -520,6 +567,8 @@ public class Translator {
 				wrInput = wrInput.substring(wrInput.indexOf("Matchande uppslagsord från andra sidan av ordboken.")+1);
 			}
 		}
+		
+		wordReferenceTranslationAttemptsCache.add(lw, res.stream().collect(Collectors.toList()));
 		return res;
 	}
 
@@ -688,6 +737,10 @@ public class Translator {
 				.anyMatch(y->!y.getOrigin().equals(Origin.GOOGLE));
 
 		return res;
+	}
+
+	public static boolean hasRunOutOfGoogleTranslateForTheDay() {
+		return cacheFailedTooManyAttemptsGoogle;
 	}
 
 

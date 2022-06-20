@@ -2,8 +2,7 @@ package discordforrad.translation;
 
 import java.io.Serializable;
 
-import discordforrad.models.language.ResultOfTranslationAttempt;
-import discordforrad.models.language.ResultOfTranslationAttempt.Origin;
+import discordforrad.translation.ResultOfTranslationAttempt.Origin;
 
 public class TranslationOutcomeFailure implements ResultOfTranslationAttempt, Serializable {
 	private final Origin o;

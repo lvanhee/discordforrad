@@ -17,8 +17,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import discordforrad.Main;
-import discordforrad.models.LanguageCode;
 import discordforrad.models.language.Dictionnary;
+import discordforrad.models.language.LanguageCode;
 import discordforrad.models.language.LanguageWord;
 import discordforrad.translation.Translator;
 
@@ -58,14 +58,15 @@ public class UserLearningTextManager {
 
 
 	public static String add(String languageText) {		
+		final String fLanguageText = languageText.replaceAll("\\|", "");
 		String index = (indexedEntries.size()+1)+"";
 		if(indexedEntries.containsKey(index))
 			throw new Error();
-		if(indexedEntries.containsValue(languageText))
-			return indexedEntries.keySet().stream().filter(x->indexedEntries.get(x).equals(languageText)).findAny().get();
-		indexedEntries.put(index, languageText);
+		if(indexedEntries.containsValue(fLanguageText))
+			return indexedEntries.keySet().stream().filter(x->indexedEntries.get(x).equals(fLanguageText)).findAny().get();
+		indexedEntries.put(index, fLanguageText);
 		
-		addToRawTextDatabase(index,languageText);
+		addToRawTextDatabase(index,fLanguageText);
 		
 		return index;
 	}

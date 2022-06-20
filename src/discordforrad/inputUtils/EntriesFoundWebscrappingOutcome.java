@@ -2,7 +2,10 @@ package discordforrad.inputUtils;
 
 import java.util.Set;
 
-public class EntriesFoundWebscrappingOutcome implements DatabaseProcessingOutcome {
+import cachingutils.advanced.failable.AttemptOutcome;
+
+@Deprecated
+public class EntriesFoundWebscrappingOutcome implements AttemptOutcome {
 	private final Set<String> entries;
 	
 	public EntriesFoundWebscrappingOutcome(Set<String> entries) {

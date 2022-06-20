@@ -1,4 +1,4 @@
-package discordforrad.models;
+package discordforrad.models.learning;
 
 import java.time.Duration;
 import java.time.LocalDateTime;

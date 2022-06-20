@@ -11,7 +11,7 @@ import java.util.stream.Collectors;
 import org.json.simple.JSONObject;
 
 import discordforrad.inputUtils.TextInputUtils;
-import discordforrad.models.LanguageCode;
+import discordforrad.models.language.LanguageCode;
 import discordforrad.models.language.LanguageWord;
 
 public class GenericRelatedForm<T extends RelatedFormType> implements RelatedForms, Serializable {

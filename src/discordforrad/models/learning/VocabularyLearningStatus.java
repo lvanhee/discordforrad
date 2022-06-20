@@ -1,4 +1,4 @@
-package discordforrad.models;
+package discordforrad.models.learning;
 
 import java.io.IOException;
 import java.net.URLEncoder;
@@ -21,23 +21,28 @@ import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
 import cachingutils.Cache;
-import cachingutils.FileBasedStringSetCache;
+import cachingutils.impl.FileBasedStringSetCache;
+import cachingutils.impl.TextFileBasedCache;
 import discordforrad.AddStringResultContext;
 import discordforrad.Main;
 import discordforrad.inputUtils.TextInputUtils;
 import discordforrad.inputUtils.UserLearningTextManager;
 import discordforrad.models.language.Dictionnary;
+import discordforrad.models.language.LanguageCode;
 import discordforrad.models.language.LanguageText;
 import discordforrad.models.language.LanguageWord;
-import discordforrad.models.language.SuccessfulTranslationDescription;
 import discordforrad.models.language.WordDescription;
-import discordforrad.models.language.ResultOfTranslationAttempt;
+import discordforrad.translation.ResultOfTranslationAttempt;
+import discordforrad.translation.SuccessfulTranslationDescription;
 import discordforrad.translation.Translator;
 
 public class VocabularyLearningStatus {
 	private static final Path FILEPATH = Paths.get(Main.ROOT_DATABASE+"learned_words.txt");
 	private static final Path FORBIDDEN_FILEPATH = 
 			Paths.get(Main.ROOT_DATABASE+"disregarded_words.txt");
+	
+	private static final Path FAILED_ATTEMPTS_FILEPATH = 
+			Paths.get(Main.ROOT_DATABASE+"databases/failed_attempts.txt");
 	
 	private static final int MAX_LEARNED = 10;
 	private static final int SHORT_TERM_NUMBER_OF_REPEAT = 2;
@@ -46,6 +51,14 @@ public class VocabularyLearningStatus {
 	private static final int DEFAULT_LONG_TERM_WORDS_TO_LEARN_EVERY_SESSION = 10;
 	private final Map<LanguageWord, Integer> successfulLearningPerWord;
 	private final Map<LanguageWord, LocalDateTime> timeLastAttempt;
+	
+	private static TextFileBasedCache<LanguageWord, Integer> numberOfFailuresPerWord = 
+			TextFileBasedCache.newInstance(FAILED_ATTEMPTS_FILEPATH.toFile(), 
+					x->x.toString(), 
+					LanguageWord::parse, 
+					x->x.toString(), 
+					Integer::parseInt,
+					"\t",true);
 	
 	//These words correspond to oddities that are not worth being learned about
 	private final Set<LanguageWord> forbiddenWords = 
@@ -219,6 +232,10 @@ public class VocabularyLearningStatus {
 		if(successfulLearningPerWord.get(lastWordAsked)<0)
 			successfulLearningPerWord.put(lastWordAsked,0);
 		updateFile();
+		
+		if(!numberOfFailuresPerWord.has(lastWordAsked))
+			numberOfFailuresPerWord.add(lastWordAsked, 0);
+		numberOfFailuresPerWord.replace(lastWordAsked, numberOfFailuresPerWord.get(lastWordAsked)+1);
 	}
 
 
@@ -460,6 +477,26 @@ public class VocabularyLearningStatus {
 				.collect(Collectors.toSet());
 		
 		return allExposableNewLanguageWords;
+	}
+
+
+	public Set<LanguageWord> getMostFailedNotMasteredWords() {
+		Set<LanguageWord> nonMasteredNonForbiddenFailedWords = getAllWords()
+				.stream().filter(x->!this.isForbiddenWord(x)&&!this.isLearnedWordWord(x) &&numberOfFailuresPerWord.has(x))
+				.collect(Collectors.toSet());
+		
+		int max = 
+				nonMasteredNonForbiddenFailedWords
+				.stream().map(x->numberOfFailuresPerWord.get(x))
+		.max(Integer::compare).get();
+		
+		return nonMasteredNonForbiddenFailedWords.stream().filter(x->numberOfFailuresPerWord.get(x)==max)
+				.collect(Collectors.toSet());
+	}
+
+
+	public void flushCaches() {
+		numberOfFailuresPerWord.flush();
 	}
 
 

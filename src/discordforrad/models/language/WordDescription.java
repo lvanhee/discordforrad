@@ -19,24 +19,24 @@ import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
-import cachingutils.PlainObjectFileBasedCache;
-import cachingutils.TextFileBasedCache;
+import cachingutils.impl.PlainObjectFileBasedCache;
+import cachingutils.impl.TextFileBasedCache;
 import discordforrad.Main;
 import discordforrad.inputUtils.WebScrapping;
 import discordforrad.inputUtils.WebScrapping.DataBaseEnum;
 import discordforrad.inputUtils.databases.BabLaProcessing;
-import discordforrad.models.LanguageCode;
 import discordforrad.models.language.WordDescription.WordType;
 import discordforrad.models.language.wordnetwork.forms.RelatedForms;
 import discordforrad.models.language.wordnetwork.forms.RelatedFormsNetwork;
 import discordforrad.models.language.wordnetwork.forms.RelatedFormsTransition;
+import discordforrad.translation.ResultOfTranslationAttempt;
 import discordforrad.translation.Translator;
 import net.dv8tion.jda.api.entities.TextChannel;
 
 public class WordDescription implements Serializable {
 	private static final File cacheFile = Paths.get(Main.ROOT_DATABASE+"caches/word_description_cache.txt").toFile();
 
-	static final TextFileBasedCache<LanguageWord, WordDescription> cache = TextFileBasedCache.newInstance(
+	private static final TextFileBasedCache<LanguageWord, WordDescription> cache = TextFileBasedCache.newInstance(
 			cacheFile, x->x.toString(), LanguageWord::parse, WordDescription::toJsonString, WordDescription::fromJsonString, "\t");
 	public static enum WordType{UNDEFINED, ADV, VTR, N, S,UTTR, PREP, ADJ, V_EXPR,VI,VITR, VITR_PART, RAKN, PRON,
 		N_PL,EXPR, INTERJ, CONJ, VBAL_UTTR, VTR_PHRASAL_SEP, VTR_PHRASAL_INSEP, VTR_PARTIKEL_OSKJ, V_PRES,

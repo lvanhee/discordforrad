@@ -11,8 +11,6 @@ import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
-import discordforrad.models.LanguageCode;
-
 public class LanguageWord implements Serializable{
 	private final LanguageCode lc;
 	private final String word;

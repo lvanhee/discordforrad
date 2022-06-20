@@ -1,12 +1,14 @@
-package discordforrad.models.language;
+package discordforrad.translation;
 
 import java.io.Serializable;
 import java.util.List;
 import java.util.Set;
 
-import discordforrad.models.LanguageCode;
+import discordforrad.models.language.LanguageCode;
+import discordforrad.models.language.LanguageText;
+import discordforrad.models.language.LanguageWord;
+import discordforrad.models.language.WordDescription;
 import discordforrad.models.language.WordDescription.WordType;
-import discordforrad.translation.Translator;
 
 public class SuccessfulTranslationDescription implements ResultOfTranslationAttempt, Serializable{
 	

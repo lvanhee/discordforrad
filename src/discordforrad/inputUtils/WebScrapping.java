@@ -16,16 +16,22 @@ import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
-import cachingutils.SplittedFileBasedCache;
+
+import cachingutils.advanced.failable.AttemptOutcome;
+import cachingutils.advanced.failable.FailedDatabaseProcessingOutcome;
+import cachingutils.advanced.failable.RequestSuccessfulButNoMatchingEntries;
+import cachingutils.advanced.failable.SuccessfulOutcome;
+import cachingutils.impl.SplittedFileBasedCache;
 import discordforrad.Main;
 import discordforrad.inputUtils.WebScrapping.DataBaseEnum;
 import discordforrad.inputUtils.databases.BabLaProcessing;
 import discordforrad.inputUtils.databases.WordReferenceDBManager;
-import discordforrad.models.LanguageCode;
+import discordforrad.models.language.LanguageCode;
 import discordforrad.models.language.LanguageWord;
 import discordforrad.models.language.wordnetwork.forms.SingleEntryWebScrapping;
 import webscrapping.RobotBasedPageReader;
 import webscrapping.WebpageReader;
+import webscrapping.WebpageReader.PageContentsResult;
 
 public class WebScrapping {
 
@@ -69,13 +75,9 @@ public class WebScrapping {
 
 
 	private static final Object lockBabLaCalls = "BabLaLock";
-	private static boolean hasWordReferenceFailed = false;
-	public static DatabaseProcessingOutcome getContentsFrom(LanguageWord lw, DataBaseEnum db) {
-		if(hasWordReferenceFailed &&db.equals(DataBaseEnum.WORD_REFERENCE))
-			return FailedDatabaseProcessingOutcome.FAILED;
-		/*db = DataBaseEnum.SVENSKA_SE;
-		lw  =LanguageWord.newInstance("katt", LanguageCode.SV);*/
-		Set<String> pageToAskFor = new HashSet<>();
+	public static AttemptOutcome getContentsFrom(LanguageWord lw, DataBaseEnum db) {
+	
+		
 		final DbLwPair inputPair = DbLwPair.newInstance(db, lw);
 
 		if(!isPossibleEntryFor(lw,db))
@@ -84,7 +86,7 @@ public class WebScrapping {
 		if(cache.has(inputPair))
 		{
 			String content = cache.get(inputPair);
-			if(!isValidlyProcessedRequest(db,content,lw))
+			if(isRequestToBeReprocesse(db,content,lw))
 			{
 				cache.delete(inputPair);
 				//	Files.delete(getCacheFileNameFor(db,lw).toPath());
@@ -92,52 +94,11 @@ public class WebScrapping {
 				return getContentsFrom(lw, db);
 				//		return SingleEntryWebScrapping.newInstance(content);
 			}
-			else return processToOutcomes(cache.get(inputPair),x->WebScrapping.isValidlyProcessedRequest(db, x,lw));
+			else return processToOutcomes(cache.get(inputPair),x->!WebScrapping.isRequestToBeReprocesse(db, x,lw),db);
 		}
+		
 
-		switch(db)
-		{
-		case WORD_REFERENCE:pageToAskFor.add("https://" + getWordReferenceWebPageName(lw)+lw.getWord()); break;
-		case SO:case SAOL:
-			String indicator = db.toString().toLowerCase();
-			String last = "https://svenska.se/"+indicator+"/?sok="+lw.getWord();
-			pageToAskFor.add(last); 
-			String page = WebpageReader.getWebclientWebPageContents(last);
-			if(page.contains("<div class=\"cshow\">"))
-			{
-				page = page.substring(page.indexOf("<div class=\"cshow\">"));
-				page = page.substring(0, page.indexOf("</div>"));
-
-				for(String sub : page.split("<a class=\"slank\" href=\""))
-				{
-					if(sub.startsWith("<div class=\"cshow\">"))continue;
-					String nextPage = sub.substring(0, sub.indexOf("\""));
-					pageToAskFor.add("https://svenska.se"+nextPage);
-				}
-			}
-			break;
-		case BAB_LA: 		
-			String languageInPlainText = null;
-			String otherLanguageInPlainText = null;
-			if(lw.getCode().equals(LanguageCode.EN))
-			{
-				languageInPlainText = "english";
-				otherLanguageInPlainText = "swedish";
-			}
-			if(lw.getCode().equals(LanguageCode.SV))
-			{
-				languageInPlainText = "swedish";
-				otherLanguageInPlainText = "english";
-			}
-			pageToAskFor.add("https://en.bab.la/dictionary/"+languageInPlainText+"-"+otherLanguageInPlainText+"/"+lw.getWord());
-			break;
-
-		default:throw new Error();
-		}
-
-
-
-
+		Set<String> pageToAskFor =  getWebpagesFor(lw,db);
 
 
 		//String res = RobotManager.getFullPageAsHtml(pageToAskFor);
@@ -147,45 +108,28 @@ public class WebScrapping {
 						x->
 						{
 							final String startOfPageHtmlHeader = "<!--!!!START_OF_PAGE "+x+"!!!-->\n";
+
+							PageContentsResult res = WebpageReader.getWebclientWebPageContents(x);
+							if(res.fromCache && isRequestToBeReprocesse(db, res.res, lw))
+								res = WebpageReader.getWebclientWebPageContents(x,true);
+
+							String servedPage =res.res;
+
 							switch (db) {
 							case WORD_REFERENCE:case SO:case SAOL:
-								return startOfPageHtmlHeader+WebpageReader.getWebclientWebPageContents(x);
+								return startOfPageHtmlHeader+servedPage;
 							case BAB_LA:
 								String r = null;
-								boolean hasBeenTriedOnceAlready = false;
-							//	synchronized (lockBabLaCalls) {
-									do
-									{
-										//String tmp = 
-										
-										System.out.println(x);
-										
-									//	System.out.println(tmp);
-										
-										r = WebpageReader.getWebclientWebPageContents(x);
-										if(r.equals("NO_PAGE_TO_BE_SERVED"))return r;
-										while(r.contains("\n "))
-											r = r.replaceAll("\n ", "\n");
-										r = r.replaceAll("\n", "");
-										r = r.replaceAll("\r", "");
-											//	RobotBasedPageReader.getFullPageAsHtml(x,BabLaProcessing.getProcessingSpeedFactor());
-										//System.out.println(r);
-										if(r.contains("<title>English-Swedish dictionary - translation - bab.la</title>")
-												||r.contains("<title>Swedish-English dictionary - translation - bab.la</title>"))
-											return "NO_PAGE_TO_BE_SERVED";
-										//	r = RobotBasedPageReader.getFullPageAsHtml(x,BabLaProcessing.getProcessingSpeedFactor());
-										hasBeenTriedOnceAlready = true;
-										boolean wasRequestSuccessful =BabLaProcessing.isValidlyProcessedRequest(r, lw);
-										if(!wasRequestSuccessful) {
-											BabLaProcessing.increaseProcessingTime();
-										}
-										else
-											BabLaProcessing.decreaseProcessingTime();
-									}
 
-
-									while(!BabLaProcessing.isValidlyProcessedRequest(r, lw));
-								//}
+								r = servedPage;
+								if(r.equals("NO_PAGE_TO_BE_SERVED"))return r;
+								while(r.contains("\n "))
+									r = r.replaceAll("\n ", "\n");
+								r = r.replaceAll("\n", "");
+								r = r.replaceAll("\r", "");
+								if(r.contains("<title>English-Swedish dictionary - translation - bab.la</title>")
+										||r.contains("<title>Swedish-English dictionary - translation - bab.la</title>"))
+									return "NO_PAGE_TO_BE_SERVED";
 								return startOfPageHtmlHeader+r;
 							default:
 								throw new Error();
@@ -206,12 +150,12 @@ public class WebScrapping {
 						)*/
 				.reduce("", (x,y)->x+"\n"+y);
 
-		if(!isValidlyProcessedRequest(db, entries,lw))
+		if(isRequestToBeReprocesse(db, entries,lw))
 		{
 			if(db.equals(DataBaseEnum.WORD_REFERENCE))
 			{
 				System.err.println("Word reference database has been already overused today");
-				hasWordReferenceFailed = true;
+				//hasWordReferenceBeenOverloaded = true;
 			}
 			return FailedDatabaseProcessingOutcome.FAILED;
 		}
@@ -222,11 +166,62 @@ public class WebScrapping {
 				cache.add(inputPair,entries);
 		}
 
-		return processToOutcomes(entries, x->WebScrapping.isValidlyProcessedRequest(db, x,lw));
+		return processToOutcomes(entries, x->!WebScrapping.isRequestToBeReprocesse(db, x,lw), db);
 	}
 
-	private static DatabaseProcessingOutcome processToOutcomes(String entry, Predicate<String> checker) {
-		if(! entry.contains("<!--!!!START_OF_PAGE "))return SingleEntryWebScrapping.newInstance(entry);
+	private static Set<String> getWebpagesFor(LanguageWord lw, DataBaseEnum db) {
+		Set<String> res = new HashSet<>();
+		switch(db)
+		{
+		case WORD_REFERENCE:res.add("https://" + getWordReferenceWebPageName(lw)+lw.getWord()); break;
+		case SO:case SAOL:
+			String indicator = db.toString().toLowerCase();
+			String last = "https://svenska.se/"+indicator+"/?sok="+lw.getWord();
+			res.add(last); 
+			PageContentsResult result = WebpageReader.getWebclientWebPageContents(last);
+			if(result.fromCache && isRequestToBeReprocesse(db, result.res, lw))
+			{
+				WebpageReader.getWebclientWebPageContents(last,true);
+			}
+
+			String page = result.res;
+			if(page.contains("<div class=\"cshow\">"))
+			{
+				page = page.substring(page.indexOf("<div class=\"cshow\">"));
+				page = page.substring(0, page.indexOf("</div>"));
+
+				for(String sub : page.split("<a class=\"slank\" href=\""))
+				{
+					if(sub.startsWith("<div class=\"cshow\">"))continue;
+					String nextPage = sub.substring(0, sub.indexOf("\""));
+					res.add("https://svenska.se"+nextPage);
+				}
+			}
+			break;
+		case BAB_LA: 		
+			String languageInPlainText = null;
+			String otherLanguageInPlainText = null;
+			if(lw.getCode().equals(LanguageCode.EN))
+			{
+				languageInPlainText = "english";
+				otherLanguageInPlainText = "swedish";
+			}
+			if(lw.getCode().equals(LanguageCode.SV))
+			{
+				languageInPlainText = "swedish";
+				otherLanguageInPlainText = "english";
+			}
+			res.add("https://en.bab.la/dictionary/"+languageInPlainText+"-"+otherLanguageInPlainText+"/"+lw.getWord());
+			break;
+
+		default:throw new Error();
+		}
+		
+		return res;
+	}
+
+	private static AttemptOutcome<Set<String>> processToOutcomes(String entry, Predicate<String> checker, DataBaseEnum db) {
+		if(! entry.contains("<!--!!!START_OF_PAGE "))return SuccessfulOutcome.newInstance(Arrays.asList(entry).stream().collect(Collectors.toSet()));
 		List<String> entries = Arrays.asList(entry.split("<!--!!!START_OF_PAGE "));
 
 		Set<String> res = entries
@@ -237,24 +232,36 @@ public class WebScrapping {
 
 		if(res.size()==0)
 			return FailedDatabaseProcessingOutcome.FAILED;
+		
+		res = res.stream().filter(x->!isRequestSuccessfulButNoTheResponseIndicatesNoMatchingEntry(entry,db)).collect(Collectors.toSet());
 
-		if(res.size()==1) 
-			return SingleEntryWebScrapping.newInstance(res.iterator().next());
-		return  EntriesFoundWebscrappingOutcome.newInstance(res);
+		return SuccessfulOutcome.newInstance(res);
 	}
 
-	public static boolean isValidlyProcessedRequest(DataBaseEnum db, String content, LanguageWord lw) {
+	private static boolean isRequestSuccessfulButNoTheResponseIndicatesNoMatchingEntry(String entry, DataBaseEnum db) {
+		switch (db) {
+		case WORD_REFERENCE: {
+			if(entry.contains("Inget uppslagsord hittat för"))
+				return true;
+		}
+		//default:
+		//	throw new IllegalArgumentException("Unexpected value: " + db);
+		}
+		return false;
+	}
+
+	public static boolean isRequestToBeReprocesse(DataBaseEnum db, String content, LanguageWord lw) {
 		if(db.equals(DataBaseEnum.WORD_REFERENCE)
-				&&!WordReferenceDBManager.isContentOfSuccessfullyLoadedPage(content))
-			return false;
+				&&WordReferenceDBManager.isDatabaseDenyingService(content))
+			return true;
 
 		if(db.equals(DataBaseEnum.BAB_LA))
-			return BabLaProcessing.isValidlyProcessedRequest(content,lw);
+			return ! BabLaProcessing.isValidlyProcessedRequest(content,lw);
 
 		if(content.equals("FAILED TO LOAD"))
-			return false;
+			return true;
 
-		return true;
+		return false;
 	}
 
 	private static boolean isPossibleEntryFor(LanguageWord lw, DataBaseEnum db) {
@@ -277,18 +284,24 @@ public class WebScrapping {
 	public static boolean isInDataBase(LanguageWord lw, DataBaseEnum db) {
 
 		if(!isPossibleEntryFor(lw, db))return false;
-		DatabaseProcessingOutcome contents = WebScrapping.getContentsFrom(lw,db);
+		AttemptOutcome<Set<String>> contents = WebScrapping.getContentsFrom(lw,db);
+		
 
-		if(contents instanceof NotFoundWebscrappingOutcome)return false;
+		if(contents instanceof FailedDatabaseProcessingOutcome)return false;
+		
+		Set<String> s = ((SuccessfulOutcome<Set<String>>)contents).getResult();
+		s = s.stream().filter(x->isInDatabaseFromText(x, lw, db)).collect(Collectors.toSet());
+		
+		return !s.isEmpty();
 
-		if(contents instanceof SingleEntryWebScrapping)
+	/*	if(contents instanceof SingleEntryWebScrapping)
 			return isInDatabaseFromText(((SingleEntryWebScrapping)contents).get(), lw, db);
-
+		
 		Set<String> entries = ((EntriesFoundWebscrappingOutcome)contents).getEntries();
 
-		for(String s: entries)
-			if(isInDatabaseFromText(s,lw,db))return true;
-		return false;
+		for(String st: entries)
+			if(isInDatabaseFromText(st,lw,db))return true;
+		return false;*/
 	}
 
 	private static boolean isInDatabaseFromText(String webPageContents, LanguageWord lw, DataBaseEnum db) {

@@ -1,4 +1,4 @@
-package discordforrad.models;
+package discordforrad.models.language;
 
 import org.json.simple.JSONObject;
 

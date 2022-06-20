@@ -17,10 +17,11 @@ import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
-import cachingutils.PlainObjectFileBasedCache;
-import cachingutils.TextFileBasedCache;
+import cachingutils.advanced.failable.AttemptOutcome;
+import cachingutils.advanced.failable.SuccessfulOutcome;
+import cachingutils.impl.PlainObjectFileBasedCache;
+import cachingutils.impl.TextFileBasedCache;
 import discordforrad.Main;
-import discordforrad.inputUtils.DatabaseProcessingOutcome;
 import discordforrad.inputUtils.EntriesFoundWebscrappingOutcome;
 import discordforrad.inputUtils.WebScrapping;
 import discordforrad.inputUtils.WebScrapping.DataBaseEnum;
@@ -34,6 +35,31 @@ public class RelatedFormsNetwork {
 			TextFileBasedCache.newInstance
 			(
 					new File(PATH_TO_KNOWN_RELATED_NETWORK_TRANSITION_CACHE), 
+					(LanguageWord i)->i.toString(), 
+					(String s)->LanguageWord.parse(s), 
+					(RelatedFormsTransition o)->o.toParsableString(), 
+					(String s)->RelatedFormsTransitionImpl.parse(s),
+					"|"
+			);
+	
+	
+	private static final String PATH_TO_KNOWN_RELATED_NETWORK_TRANSITION_CACHE_SAOL = Main.ROOT_DATABASE+"databases/related_forms_network_saol.txt";
+	private static final TextFileBasedCache<LanguageWord, RelatedFormsTransition> knownTransitionsPerWordSaol =
+			TextFileBasedCache.newInstance
+			(
+					new File(PATH_TO_KNOWN_RELATED_NETWORK_TRANSITION_CACHE_SAOL), 
+					(LanguageWord i)->i.toString(), 
+					(String s)->LanguageWord.parse(s), 
+					(RelatedFormsTransition o)->o.toParsableString(), 
+					(String s)->RelatedFormsTransitionImpl.parse(s),
+					"|"
+			);
+	
+	private static final String PATH_TO_KNOWN_RELATED_NETWORK_TRANSITION_CACHE_SO = Main.ROOT_DATABASE+"databases/related_forms_network_so.txt";
+	private static final TextFileBasedCache<LanguageWord, RelatedFormsTransition> knownTransitionsPerWordSo =
+			TextFileBasedCache.newInstance
+			(
+					new File(PATH_TO_KNOWN_RELATED_NETWORK_TRANSITION_CACHE_SO), 
 					(LanguageWord i)->i.toString(), 
 					(String s)->LanguageWord.parse(s), 
 					(RelatedFormsTransition o)->o.toParsableString(), 
@@ -112,15 +138,17 @@ public class RelatedFormsNetwork {
 	}
 
 	private static RelatedFormsTransition getRelatedFormsSaol(LanguageWord lw) {
+		if(knownTransitionsPerWordSaol.has(lw))
+			return knownTransitionsPerWordSaol.get(lw);
 		RelatedFormsTransition res = RelatedFormsTransitionImpl.newInstance();
 		
-		DatabaseProcessingOutcome outcome = WebScrapping.getContentsFrom(lw, DataBaseEnum.SAOL); 
+		AttemptOutcome<Set<String>> outcome = WebScrapping.getContentsFrom(lw, DataBaseEnum.SAOL); 
 		
 		Set<String> allContents = new HashSet<>();
-		if(outcome instanceof SingleEntryWebScrapping)
-			allContents.add(((SingleEntryWebScrapping)outcome).get());
-		else if(outcome instanceof EntriesFoundWebscrappingOutcome)
-			allContents.addAll(((EntriesFoundWebscrappingOutcome)outcome).getEntries());
+		if(outcome instanceof SuccessfulOutcome)
+		{
+			allContents.addAll(((SuccessfulOutcome<Set<String>>)outcome).getResult());
+		}
 		else throw new Error();
 		
 		for(String contents:allContents)
@@ -143,19 +171,24 @@ public class RelatedFormsNetwork {
 			}
 		}
 		
+		knownTransitionsPerWordSaol.add(lw, res);
 		return res;
 	}
 
 	
 
 	private static RelatedFormsTransition getRelatedFormsSo(LanguageWord lw) {
-		DatabaseProcessingOutcome outcome = WebScrapping.getContentsFrom(lw, DataBaseEnum.SO);
+		if(knownTransitionsPerWordSo.has(lw))
+			return knownTransitionsPerWordSo.get(lw);
+		AttemptOutcome outcome = WebScrapping.getContentsFrom(lw, DataBaseEnum.SO);
 		Set<String> entries = new HashSet<>();
 		
-		if(outcome instanceof EntriesFoundWebscrappingOutcome)
-			entries.addAll(((EntriesFoundWebscrappingOutcome)outcome).getEntries());
-		else if(outcome instanceof SingleEntryWebScrapping)
-			entries.add(((SingleEntryWebScrapping)outcome).get());
+		if(outcome instanceof SuccessfulOutcome)
+			entries.addAll(((SuccessfulOutcome<Set<String>>)outcome).getResult());
+		else throw new Error();
+		
+		
+		
 		
 		RelatedFormsTransition res = RelatedFormsTransitionImpl.newInstance();
 		
@@ -179,6 +212,7 @@ public class RelatedFormsNetwork {
 			}
 		}
 		
+		knownTransitionsPerWordSo.add(lw, res);
 		return res;
 	}
 

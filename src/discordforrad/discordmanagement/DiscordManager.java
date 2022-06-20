@@ -33,22 +33,22 @@ import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
 import com.sedmelluq.discord.lavaplayer.track.BaseAudioTrack;
 
 import discordforrad.AddStringResultContext;
-import discordforrad.DisOrdforrAI;
+import discordforrad.DiscOrdforrAI;
 import discordforrad.Main;
 import discordforrad.discordmanagement.audio.PlayerManager;
 import discordforrad.inputUtils.TextInputUtils;
 import discordforrad.inputUtils.UserLearningTextManager;
-import discordforrad.models.LanguageCode;
-import discordforrad.models.VocabularyLearningStatus;
 import discordforrad.models.language.Dictionnary;
+import discordforrad.models.language.LanguageCode;
 import discordforrad.models.language.LanguageText;
 import discordforrad.models.language.LanguageWord;
 import discordforrad.models.language.StringPair;
-import discordforrad.models.language.SuccessfulTranslationDescription;
-import discordforrad.models.language.ResultOfTranslationAttempt;
 import discordforrad.models.language.WordDescription;
 import discordforrad.models.language.WordDescription.WordType;
+import discordforrad.models.learning.VocabularyLearningStatus;
 import discordforrad.models.learning.focus.ReadThroughFocus;
+import discordforrad.translation.ResultOfTranslationAttempt;
+import discordforrad.translation.SuccessfulTranslationDescription;
 import discordforrad.translation.Translator;
 import net.dv8tion.jda.api.entities.Message.Attachment;
 import net.dv8tion.jda.api.JDA;
@@ -92,9 +92,9 @@ public class DiscordManager extends ListenerAdapter {
 		AudioPlayerManager playerManager = new DefaultAudioPlayerManager();
 		AudioSourceManagers.registerRemoteSources(playerManager);
 
-		LocalSeekableInputStream localStream = new LocalSeekableInputStream(
+		/*LocalSeekableInputStream localStream = new LocalSeekableInputStream(
 				new File("C:\\Users\\loisv\\Downloads\\binary.mp3"));
-		AudioTrack at = new Mp3AudioTrack(new AudioTrackInfo("", "", 1000, "", true, ""), localStream);
+		AudioTrack at = new Mp3AudioTrack(new AudioTrackInfo("", "", 1000, "", true, ""), localStream);*/
 		//	AudioLoadResultHandler load = new FunctionalResultHandler(trackConsumer, playlistConsumer, emptyResultHandler, exceptionConsumer)
 
 		//	playerManager.loadItem(reference, resultHandler)
@@ -127,20 +127,20 @@ public class DiscordManager extends ListenerAdapter {
 	public void onGuildMessageReceived(GuildMessageReceivedEvent event) {
 		Thread.currentThread().setName("ProcessingIncomingDiscordMessage");
 		if (event.getMessage().getContentRaw().equals("y")) {
-			DisOrdforrAI.INSTANCE.confirm(false);
+			DiscOrdforrAI.INSTANCE.confirm(false);
 		}else if (event.getMessage().getContentRaw().equals("Y")) {
-			DisOrdforrAI.INSTANCE.confirm(true);
+			DiscOrdforrAI.INSTANCE.confirm(true);
 		}
 		else if (event.getMessage().getContentRaw().equals("F")) {
-			DisOrdforrAI.INSTANCE.forbidLastWord();
-			DisOrdforrAI.INSTANCE.processPostWordAttempt();
+			DiscOrdforrAI.INSTANCE.forbidLastWord();
+			DiscOrdforrAI.INSTANCE.processPostWordAttempt();
 		}
 		else if (event.getMessage().getContentRaw().equals("/new-session")) {
-			DisOrdforrAI.INSTANCE.startNewSession();
+			DiscOrdforrAI.INSTANCE.startNewSession();
 		}
 		else if (event.getMessage().getContentRaw().equals("/all-words")) {
 			print(
-			DisOrdforrAI.INSTANCE.getVocabularyLearningStatus().getAllLongTermWords()
+			DiscOrdforrAI.INSTANCE.getVocabularyLearningStatus().getAllLongTermWords()
 			.stream()
 			.sorted((x,y)->x.toString().compareTo(y.toString()))
 			.collect(Collectors.toList()).toString());
@@ -149,7 +149,7 @@ public class DiscordManager extends ListenerAdapter {
 			if (event.getMessage().getContentRaw().equalsIgnoreCase("n")) {	
 
 				try {
-					DisOrdforrAI.INSTANCE.recordFailedToRecallLastWord();
+					DiscOrdforrAI.INSTANCE.recordFailedToRecallLastWord();
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
@@ -158,7 +158,7 @@ public class DiscordManager extends ListenerAdapter {
 			{
 				String message = event.getMessage().getContentRaw();
 				String[] bits = message.split(" "); 
-				DisOrdforrAI.INSTANCE.setFocus(
+				DiscOrdforrAI.INSTANCE.setFocus(
 						ReadThroughFocus.newInstance(bits[1], 
 								LanguageCode.valueOf(bits[2])));
 			}
@@ -175,7 +175,7 @@ public class DiscordManager extends ListenerAdapter {
 					else {
 						String message = event.getMessage().getContentRaw();
 						try {
-							DisOrdforrAI.INSTANCE.addFreeString(message,c);
+							DiscOrdforrAI.INSTANCE.addFreeString(message,c);
 							event.getChannel().sendMessage("Added "+ c.getWords().size()+" words: "+c.getWords() ).queue();
 							return;
 						}
@@ -201,7 +201,7 @@ public class DiscordManager extends ListenerAdapter {
 				while((line = br.readLine()) != null)
 					total+=line+"\n";
 
-				DisOrdforrAI.INSTANCE.addFreeString(total, c);
+				DiscOrdforrAI.INSTANCE.addFreeString(total, c);
 				br.close();
 			} catch (InterruptedException | ExecutionException e) {
 				e.printStackTrace();

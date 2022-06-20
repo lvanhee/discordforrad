@@ -26,18 +26,17 @@ import discordforrad.Main;
 import discordforrad.discordmanagement.DiscordManager;
 import discordforrad.discordmanagement.audio.LocalAudioDatabase;
 import discordforrad.inputUtils.UserLearningTextManager;
-import discordforrad.models.LanguageCode;
-import discordforrad.models.LearningModel;
-import discordforrad.models.VocabularyLearningStatus;
 import discordforrad.models.language.Dictionnary;
+import discordforrad.models.language.LanguageCode;
 import discordforrad.models.language.LanguageWord;
-import discordforrad.models.language.SuccessfulTranslationDescription;
-import discordforrad.models.language.ResultOfTranslationAttempt;
 import discordforrad.models.language.WordDescription;
-import discordforrad.models.language.ResultOfTranslationAttempt.Origin;
-import discordforrad.models.language.wordnetwork.WordNetwork;
+import discordforrad.models.learning.LearningModel;
+import discordforrad.models.learning.VocabularyLearningStatus;
 import discordforrad.models.learning.focus.ReadThroughFocus;
+import discordforrad.translation.ResultOfTranslationAttempt;
+import discordforrad.translation.SuccessfulTranslationDescription;
 import discordforrad.translation.Translator;
+import discordforrad.translation.ResultOfTranslationAttempt.Origin;
 
 public class Session {
 	private final List<LanguageWord> shortTermWordsToTeachInThisSession=new LinkedList<>();
@@ -71,7 +70,7 @@ public class Session {
 		
 
 		List<LanguageWord> newWordsToLearnFromCurrentFocus = currentFocus.getAllValidWordsSortedByTheirOrderOfOccurrenceInFocusTexts().stream().filter(x->vls.isEarlyPhaseWord(x)&&vls.isExposableForLearning(x))
-				.collect(Collectors.toList()).subList(0, 5);
+				.collect(Collectors.toList()).subList(0, Integer.min(10,currentFocus.getAllEarlyPhaseWordsExposableForLearning(vls).size()));
 		mandatoryWordsToConsider.addAll(newWordsToLearnFromCurrentFocus);
 
 		//List<LanguageWord> translationsOfMostFrequentWords = getTranslationsOfMostFrequentlyUsedWords(5,vls);		  

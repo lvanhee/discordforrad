@@ -7,7 +7,7 @@ import java.util.Set;
 import org.json.simple.JSONObject;
 
 import discordforrad.inputUtils.WebScrapping.DataBaseEnum;
-import discordforrad.models.LanguageCode;
+import discordforrad.models.language.LanguageCode;
 import discordforrad.models.language.LanguageWord;
 import discordforrad.models.language.WordDescription;
 import discordforrad.models.language.WordDescription.WordType;
