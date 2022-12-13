@@ -25,6 +25,7 @@ public class Main {
 		DiscOrdforrAI.INSTANCE.startNewSession();
 		new Thread(()->{
 			try {
+				
 				Thread.sleep(60000);
 				DatabaseFiller.main(new String[0]);
 

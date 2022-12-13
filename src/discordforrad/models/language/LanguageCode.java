@@ -4,7 +4,8 @@ import org.json.simple.JSONObject;
 
 public enum LanguageCode {
 	EN,
-	SV;
+	SV,
+	FR;
 
 	public static LanguageCode otherLanguage(LanguageCode languageCode) {
 		if(languageCode==EN)return SV;

@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import discordforrad.models.language.LanguageCode;
+
 public interface ResultOfTranslationAttempt {
 	public enum Origin{WORD_REFERENCE, BAB_LA, GOOGLE}
 
@@ -38,6 +40,8 @@ public interface ResultOfTranslationAttempt {
 	public static String toParsableString(Set<ResultOfTranslationAttempt> s) {
 		return s.stream().map(x->x.toParsableString()).reduce( (x,y)->x+";"+y).get();
 	}
+
+	public LanguageCode getResultLanguageCode();
 
 
 }

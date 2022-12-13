@@ -19,7 +19,6 @@ import java.util.stream.Collectors;
 
 import cachingutils.advanced.failable.AttemptOutcome;
 import cachingutils.advanced.failable.FailedDatabaseProcessingOutcome;
-import cachingutils.advanced.failable.RequestSuccessfulButNoMatchingEntries;
 import cachingutils.advanced.failable.SuccessfulOutcome;
 import cachingutils.impl.TextFileBasedCache;
 import discordforrad.Main;
@@ -32,7 +31,6 @@ import discordforrad.models.language.LanguageText;
 import discordforrad.models.language.LanguageWord;
 import discordforrad.models.language.WordDescription;
 import discordforrad.models.language.WordDescription.WordType;
-import discordforrad.models.language.wordnetwork.forms.SingleEntryWebScrapping;
 import discordforrad.translation.ResultOfTranslationAttempt.Origin;
 
 public class Translator {
@@ -44,11 +42,11 @@ public class Translator {
 	private static final File PATH_TO_SENTENCE_TRANSLATION_CACHE = new File(Main.ROOT_DATABASE+"databases/google_translated_sentences_database.txt");
 	
 	
-	private static final TextFileBasedCache<LanguageWord, LanguageText> successfullyTranslatedGoogleWords=
+	private static final TextFileBasedCache<TranslationQuery, LanguageText> successfullyTranslatedGoogleWords=
 			TextFileBasedCache.newInstance(
 					PATH_TO_GOOGLE_TRANSLATE_CACHE,
 					i->i.toString(),
-					LanguageWord::parse,
+					TranslationQuery::parse,
 					o->o.toString(),
 					LanguageText::parse,"\t");
 
@@ -173,7 +171,7 @@ public class Translator {
 	
 	public static ResultOfTranslationAttempt getGoogleTranslation(LanguageText input, LanguageCode translateTo, boolean cached) {
 		if(input.isSingleWord())
-			return getGoogleTranslation(input.toSingleWord());
+			return getGoogleTranslation(TranslationQuery.newInstance(input.toSingleWord(), translateTo));
 		
 		if(textTranslationCache.has(input))
 			return SuccessfulTranslationDescription.newInstance(textTranslationCache.get(input), "", WordType.UNDEFINED, Origin.GOOGLE);
@@ -185,18 +183,18 @@ public class Translator {
 		return res;
 	}
 
-	public static ResultOfTranslationAttempt getGoogleTranslation(LanguageWord lw) {
-		synchronized(lw)
+	public static ResultOfTranslationAttempt getGoogleTranslation(TranslationQuery tq) {
+		synchronized(tq.getWord())
 		{
-			if(successfullyTranslatedGoogleWords.has(lw))
+			if(successfullyTranslatedGoogleWords.has(tq))
 				return SuccessfulTranslationDescription
-						.newInstance(successfullyTranslatedGoogleWords.get(lw), "",
+						.newInstance(successfullyTranslatedGoogleWords.get(tq), "",
 								WordType.UNDEFINED, discordforrad.translation.ResultOfTranslationAttempt.Origin.GOOGLE);
-			ResultOfTranslationAttempt res = getOutcomeOfGoogleTranslation(LanguageText.newInstance(lw), LanguageCode.otherLanguage(lw.getCode()));
+			ResultOfTranslationAttempt res = getOutcomeOfGoogleTranslation(LanguageText.newInstance(tq.getWord()), tq.getTargetLanguage());
 
 			if(res instanceof SuccessfulTranslationDescription)
 			{
-				successfullyTranslatedGoogleWords.add(lw, ((SuccessfulTranslationDescription)res).getTranslatedText());
+				successfullyTranslatedGoogleWords.add(tq, ((SuccessfulTranslationDescription)res).getTranslatedText());
 			}
 			
 			return res;
@@ -204,12 +202,13 @@ public class Translator {
 	}
 
 
-	public static Set<ResultOfTranslationAttempt> getResultOfTranslationAttempts(LanguageWord word) {
+	public static Set<ResultOfTranslationAttempt> getResultOfTranslationAttempts(TranslationQuery tq) {
 		synchronized (word) {
 			Set<ResultOfTranslationAttempt> res = new HashSet<>();
 			if(translationAttemptsCache.has(word))
 			{
-				res.addAll(translationAttemptsCache.get(word));
+				
+				res.addAll(translationAttemptsCache.get(word).stream().filter(x->x.getResultLanguageCode()==lc).collect(Collectors.toList()));
 			//	res.addAll(BabLaProcessing.getBabLaTranslationDescriptions(word));
 			//	res.add(getGoogleTranslation(word));
 				
@@ -218,9 +217,9 @@ public class Translator {
 				res = res.stream().filter(x->!(x instanceof TranslationOutcomeFailure)).collect(Collectors.toSet());
 			}
 
-			ResultOfTranslationAttempt googleTranslation = getGoogleTranslation(word);
-			Set<ResultOfTranslationAttempt> babLaTranslations = BabLaProcessing.getBabLaTranslationDescriptions(word);
-			Set<ResultOfTranslationAttempt> wordReferenceTranslation = getWordReferenceTranslation(word);
+			ResultOfTranslationAttempt googleTranslation = getGoogleTranslation(tq);
+			Set<ResultOfTranslationAttempt> babLaTranslations = BabLaProcessing.getBabLaTranslationDescriptions(tq);
+			Set<ResultOfTranslationAttempt> wordReferenceTranslation = getWordReferenceTranslation(tq);
 
 			
 			res.add(googleTranslation);
@@ -228,7 +227,7 @@ public class Translator {
 			res.addAll(wordReferenceTranslation);
 
 			
-			translationAttemptsCache.addOrReplace(word,res.stream().collect(Collectors.toList()));
+			translationAttemptsCache.addOrReplace(tq,res.stream().collect(Collectors.toList()));
 			return res;
 		}
 	}
@@ -700,11 +699,11 @@ public class Translator {
 	}
 
 	private static final Map<LanguageWord, Set<LanguageWord>> translationPerWord = new ConcurrentHashMap<>();
-	public static Set<LanguageWord> getTranslationsOf(LanguageWord lw) {
+	public static Set<LanguageWord> getTranslationsOf(LanguageWord lw, LanguageCode lc) {
 		if(translationPerWord.containsKey(lw))
 			return translationPerWord.get(lw);
 		Set<ResultOfTranslationAttempt> translations = 
-				Translator.getResultOfTranslationAttempts(lw);
+				Translator.getResultOfTranslationAttempts(lw, lc);
 		Set<LanguageWord> alternatives = 
 				translations.stream()
 				.filter(x->x instanceof SuccessfulTranslationDescription)
@@ -712,7 +711,6 @@ public class Translator {
 				.map(x->x.getTranslatedText())
 				.filter(x->x.getListOfValidWords().size()==1)
 				.map(x->x.getListOfValidWords().get(0)).collect(Collectors.toSet());
-
 
 		translationPerWord.put(lw, alternatives);
 		return alternatives;

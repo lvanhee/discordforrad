@@ -20,7 +20,12 @@ public class DatabaseFiller {
 
 	public static void main(String[] args) throws IOException
 	{
-
+		
+		VocabularyLearningStatus vls = VocabularyLearningStatus.loadFromFile();
+		Set<LanguageWord> allWords = vls.getAllLongTermWords();
+		
+		allWords.stream().forEach(x->{ System.out.println(x+" -> "+Translator.getTranslationsOf(x));});
+		
 		Dictionnary.getAllKnownWords().stream().sorted((x,y)->x.toString().compareTo(y.toString())).forEach(x->{
 			System.out.println("Database filler: processing:"+x);
 			System.out.println(Translator.getTranslationsOf(x));

@@ -19,7 +19,6 @@ import java.util.stream.Collectors;
 
 import cachingutils.advanced.failable.AttemptOutcome;
 import cachingutils.advanced.failable.FailedDatabaseProcessingOutcome;
-import cachingutils.advanced.failable.RequestSuccessfulButNoMatchingEntries;
 import cachingutils.advanced.failable.SuccessfulOutcome;
 import cachingutils.impl.SplittedFileBasedCache;
 import discordforrad.Main;
@@ -28,7 +27,7 @@ import discordforrad.inputUtils.databases.BabLaProcessing;
 import discordforrad.inputUtils.databases.WordReferenceDBManager;
 import discordforrad.models.language.LanguageCode;
 import discordforrad.models.language.LanguageWord;
-import discordforrad.models.language.wordnetwork.forms.SingleEntryWebScrapping;
+import discordforrad.translation.TranslationQuery;
 import webscrapping.RobotBasedPageReader;
 import webscrapping.WebpageReader;
 import webscrapping.WebpageReader.PageContentsResult;
@@ -42,19 +41,19 @@ public class WebScrapping {
 	private static final class DbLwPair
 	{
 		private final DataBaseEnum db;
-		private final LanguageWord lw;
+		private final TranslationQuery lw;
 
-		private DbLwPair(DataBaseEnum db, LanguageWord lw) {
+		private DbLwPair(DataBaseEnum db, TranslationQuery lw) {
 			this.db = db; this.lw = lw;
 		}
 
-		public static DbLwPair newInstance(DataBaseEnum db2, LanguageWord lw2) {
+		public static DbLwPair newInstance(DataBaseEnum db2, TranslationQuery lw2) {
 			return new DbLwPair(db2, lw2);
 		}
 
 	}
 
-	public static File getCacheFileNameFor(DataBaseEnum db, LanguageWord lw)
+	public static File getCacheFileNameFor(DataBaseEnum db, TranslationQuery lw)
 	{
 		String cacheFolder = "\\"+db.name()+"\\";
 
@@ -75,30 +74,30 @@ public class WebScrapping {
 
 
 	private static final Object lockBabLaCalls = "BabLaLock";
-	public static AttemptOutcome getContentsFrom(LanguageWord lw, DataBaseEnum db) {
+	public static AttemptOutcome getContentsFrom(TranslationQuery tq, DataBaseEnum db) {
 	
 		
-		final DbLwPair inputPair = DbLwPair.newInstance(db, lw);
+		final DbLwPair inputPair = DbLwPair.newInstance(db, tq);
 
-		if(!isPossibleEntryFor(lw,db))
+		if(!isPossibleEntryFor(tq,db))
 			throw new Error();
 
 		if(cache.has(inputPair))
 		{
 			String content = cache.get(inputPair);
-			if(isRequestToBeReprocesse(db,content,lw))
+			if(isRequestToBeReprocesse(db,content,tq))
 			{
 				cache.delete(inputPair);
 				//	Files.delete(getCacheFileNameFor(db,lw).toPath());
-				System.err.println("Deleting wrong input from:"+db+" "+lw);
-				return getContentsFrom(lw, db);
+				System.err.println("Deleting wrong input from:"+db+" "+tq);
+				return getContentsFrom(tq, db);
 				//		return SingleEntryWebScrapping.newInstance(content);
 			}
-			else return processToOutcomes(cache.get(inputPair),x->!WebScrapping.isRequestToBeReprocesse(db, x,lw),db);
+			else return processToOutcomes(cache.get(inputPair),x->!WebScrapping.isRequestToBeReprocesse(db, x,tq),db);
 		}
 		
 
-		Set<String> pageToAskFor =  getWebpagesFor(lw,db);
+		Set<String> pageToAskFor =  getWebpagesFor(tq,db);
 
 
 		//String res = RobotManager.getFullPageAsHtml(pageToAskFor);
@@ -110,7 +109,7 @@ public class WebScrapping {
 							final String startOfPageHtmlHeader = "<!--!!!START_OF_PAGE "+x+"!!!-->\n";
 
 							PageContentsResult res = WebpageReader.getWebclientWebPageContents(x);
-							if(res.fromCache && isRequestToBeReprocesse(db, res.res, lw))
+							if(res.fromCache && isRequestToBeReprocesse(db, res.res, tq))
 								res = WebpageReader.getWebclientWebPageContents(x,true);
 
 							String servedPage =res.res;
@@ -150,7 +149,7 @@ public class WebScrapping {
 						)*/
 				.reduce("", (x,y)->x+"\n"+y);
 
-		if(isRequestToBeReprocesse(db, entries,lw))
+		if(isRequestToBeReprocesse(db, entries,tq))
 		{
 			if(db.equals(DataBaseEnum.WORD_REFERENCE))
 			{
@@ -166,14 +165,15 @@ public class WebScrapping {
 				cache.add(inputPair,entries);
 		}
 
-		return processToOutcomes(entries, x->!WebScrapping.isRequestToBeReprocesse(db, x,lw), db);
+		return processToOutcomes(entries, x->!WebScrapping.isRequestToBeReprocesse(db, x,tq), db);
 	}
 
-	private static Set<String> getWebpagesFor(LanguageWord lw, DataBaseEnum db) {
+	private static Set<String> getWebpagesFor(TranslationQuery tq, DataBaseEnum db) {
+		LanguageWord lw = tq.getWord();
 		Set<String> res = new HashSet<>();
 		switch(db)
 		{
-		case WORD_REFERENCE:res.add("https://" + getWordReferenceWebPageName(lw)+lw.getWord()); break;
+		case WORD_REFERENCE:res.add("https://" + getWordReferenceWebPageName(tq)+lw.getWord()); break;
 		case SO:case SAOL:
 			String indicator = db.toString().toLowerCase();
 			String last = "https://svenska.se/"+indicator+"/?sok="+lw.getWord();
@@ -264,33 +264,28 @@ public class WebScrapping {
 		return false;
 	}
 
-	private static boolean isPossibleEntryFor(LanguageWord lw, DataBaseEnum db) {
-		if(db.equals(DataBaseEnum.SO)&&lw.getCode()!=LanguageCode.SV)return false;
+	private static boolean isPossibleEntryFor(TranslationQuery lw, DataBaseEnum db) {
+		if(db.equals(DataBaseEnum.SO)&&lw.getWord().getCode()!=LanguageCode.SV)return false;
 
 		return true;
 	}
 
 
 
-	private static String getWordReferenceNameFor(LanguageCode code) {
-		switch (code) {
-		case SV:return "sven";
-		case EN:return "ensv";
-		default:
-			throw new IllegalArgumentException("Unexpected value: " + code);
-		}
+	private static String getWordReferenceNameFor(TranslationQuery tq) {
+		return tq.getWord().getCode().toString().toLowerCase()+tq.getTargetLanguage().toString().toLowerCase();
 	}
 
-	public static boolean isInDataBase(LanguageWord lw, DataBaseEnum db) {
+	public static boolean isInDataBase(TranslationQuery tq, DataBaseEnum db) {
 
-		if(!isPossibleEntryFor(lw, db))return false;
-		AttemptOutcome<Set<String>> contents = WebScrapping.getContentsFrom(lw,db);
+		if(!isPossibleEntryFor(tq,db))return false;
+		AttemptOutcome<Set<String>> contents = WebScrapping.getContentsFrom(tq,db);
 		
 
 		if(contents instanceof FailedDatabaseProcessingOutcome)return false;
 		
 		Set<String> s = ((SuccessfulOutcome<Set<String>>)contents).getResult();
-		s = s.stream().filter(x->isInDatabaseFromText(x, lw, db)).collect(Collectors.toSet());
+		s = s.stream().filter(x->isInDatabaseFromText(x, tq, db)).collect(Collectors.toSet());
 		
 		return !s.isEmpty();
 
@@ -304,13 +299,13 @@ public class WebScrapping {
 		return false;*/
 	}
 
-	private static boolean isInDatabaseFromText(String webPageContents, LanguageWord lw, DataBaseEnum db) {
+	private static boolean isInDatabaseFromText(String webPageContents, TranslationQuery tq, DataBaseEnum db) {
 
 
 		switch(db)
 		{
 		case WORD_REFERENCE:
-			if(!webPageContents.contains(getWordReferenceWebPageName(lw)))
+			if(!webPageContents.contains(getWordReferenceWebPageName(tq)))
 				return false;
 
 			boolean result = webPageContents.contains("Huvudsakliga översättningar")
@@ -322,34 +317,34 @@ public class WebScrapping {
 
 		case SO:case SAOL:
 			String toStudy = webPageContents.replaceAll("\n", "").replaceAll("\r", "").replaceAll(" ", "");
-			boolean resultNotFound =toStudy.contains("Sökningenpå<strong>"+lw.getWord().replaceAll(" ", "")+"</strong>iSOgavingasvar.")||
-					toStudy.contains("Sökningenpå<strong>"+lw.getWord().replaceAll(" ", "")+"</strong>iSAOLgavingasvar."); 
+			boolean resultNotFound =toStudy.contains("Sökningenpå<strong>"+tq.getWord().getWord().replaceAll(" ", "")+"</strong>iSOgavingasvar.")||
+					toStudy.contains("Sökningenpå<strong>"+tq.getWord().getWord().replaceAll(" ", "")+"</strong>iSAOLgavingasvar."); 
 			return !resultNotFound;
 		case BAB_LA:
 			String otherLanguageInPlainText = null;
-			if(lw.getCode().equals(LanguageCode.EN))
+			if(tq.getTargetLanguage().equals(LanguageCode.SV))
 			{
 				otherLanguageInPlainText = "swedish";
 			}
-			if(lw.getCode().equals(LanguageCode.SV))
+			if(tq.getTargetLanguage().equals(LanguageCode.EN))
 			{
 				otherLanguageInPlainText = "english";
 			}
 
 			if(webPageContents.toLowerCase()
-					.contains("our team was informed that the translation for \""+lw.getWord()+"\" is missing"))
+					.contains("our team was informed that the translation for \""+tq.getWord().getWord()+"\" is missing"))
 				return false;	
 
-			result = webPageContents.toLowerCase().contains("\""+lw.getWord()+"\" in "+otherLanguageInPlainText);
+			result = webPageContents.toLowerCase().contains("\""+tq.getWord().getWord()+"\" in "+otherLanguageInPlainText);
 
 			return result;
 		default : throw new Error();
 		}
 	}
 
-	public static String getWordReferenceWebPageName(LanguageWord lw)
+	public static String getWordReferenceWebPageName(TranslationQuery tq)
 	{
-		return "www.wordreference.com/"+getWordReferenceNameFor(lw.getCode())+"/";
+		return "www.wordreference.com/"+getWordReferenceNameFor(tq)+"/";
 	}
 
 }

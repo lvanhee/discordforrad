@@ -12,7 +12,6 @@ import java.util.stream.Collectors;
 
 import cachingutils.advanced.failable.AttemptOutcome;
 import cachingutils.advanced.failable.FailedDatabaseProcessingOutcome;
-import cachingutils.advanced.failable.RequestSuccessfulButNoMatchingEntries;
 import cachingutils.advanced.failable.SuccessfulOutcome;
 import cachingutils.impl.FileBasedStringSetCache;
 import cachingutils.impl.TextFileBasedCache;
@@ -25,9 +24,9 @@ import discordforrad.models.language.LanguageText;
 import discordforrad.models.language.LanguageWord;
 import discordforrad.models.language.WordDescription;
 import discordforrad.models.language.WordDescription.WordType;
-import discordforrad.models.language.wordnetwork.forms.SingleEntryWebScrapping;
 import discordforrad.translation.ResultOfTranslationAttempt;
 import discordforrad.translation.SuccessfulTranslationDescription;
+import discordforrad.translation.TranslationQuery;
 import discordforrad.translation.Translator;
 
 public class BabLaProcessing {
@@ -38,39 +37,39 @@ public class BabLaProcessing {
 	private static final File PATH_TO_BAB_LA_FAILED_TO_BE_TRANSLATED_DATABASE
 	= new File(Main.ROOT_DATABASE+"caches/words_that_are_not_translated_by_babla.txt");
 
-	private static final FileBasedStringSetCache<LanguageWord> wordsWithoutEntryInBabla=
-			FileBasedStringSetCache.loadCache(PATH_TO_BAB_LA_FAILED_TO_BE_TRANSLATED_DATABASE.toPath(), LanguageWord::parse, x->x.toString());
+	private static final FileBasedStringSetCache<TranslationQuery> wordsWithoutEntryInBabla=
+			FileBasedStringSetCache.loadCache(PATH_TO_BAB_LA_FAILED_TO_BE_TRANSLATED_DATABASE.toPath(), TranslationQuery::parse, x->x.toString());
 	
-	private static final TextFileBasedCache<LanguageWord,Set<ResultOfTranslationAttempt>> babLaPrecomputedTranslations=
+	private static final TextFileBasedCache<TranslationQuery,Set<ResultOfTranslationAttempt>> babLaPrecomputedTranslations=
 			TextFileBasedCache.newInstance(
 					PATH_TO_BAB_LA_TRANSLATIONS_DATABASE, x->x.toString(), 
-					LanguageWord::parse, x->ResultOfTranslationAttempt.toParsableString(x), ResultOfTranslationAttempt::parseSet, "\t");
+					TranslationQuery::parse, x->ResultOfTranslationAttempt.toParsableString(x), ResultOfTranslationAttempt::parseSet, "\t");
 
 
 	public static boolean isBabLaDictionnaryConsideredForNewWords() {
 		return false;
 	}
 
-	public static boolean isWordTranslatedByBabLa(LanguageWord lw) {
-		if(wordsWithoutEntryInBabla.contains(lw))
+	public static boolean isWordTranslatedByBabLa(TranslationQuery tq) {
+		if(wordsWithoutEntryInBabla.contains(tq))
 			return false;
 		
-		if(babLaPrecomputedTranslations.has(lw))
-			return babLaPrecomputedTranslations.get(lw).isEmpty();
+		if(babLaPrecomputedTranslations.has(tq))
+			return babLaPrecomputedTranslations.get(tq).isEmpty();
 		
 		
-		AttemptOutcome<Set<String>> outcome = WebScrapping.getContentsFrom(lw, DataBaseEnum.BAB_LA);
+		AttemptOutcome<Set<String>> outcome = WebScrapping.getContentsFrom(tq, DataBaseEnum.BAB_LA);
 		
 		if(outcome instanceof FailedDatabaseProcessingOutcome)//babla failure is assumed to be a "no result" outcome
 		{
-			wordsWithoutEntryInBabla.add(lw);
+			wordsWithoutEntryInBabla.add(tq);
 			return false;
 		}
 		
 		Set<String> str = ((SuccessfulOutcome<Set<String>>)outcome).getResult();
 		if(str.isEmpty())
 		{
-			wordsWithoutEntryInBabla.add(lw);
+			wordsWithoutEntryInBabla.add(tq);
 			return false;
 		}
 		
@@ -78,33 +77,33 @@ public class BabLaProcessing {
 			throw new Error();
 		
 		String babLaInput = str.iterator().next();
-		boolean missing = (babLaInput.contains("Our team was informed that the translation for \""+lw.getWord()+"\" is missing."));
-		boolean notInDictionnary = babLaInput.contains("\""+lw+"\" is currently not in our dictionary.");
+		boolean missing = (babLaInput.contains("Our team was informed that the translation for \""+tq.getWord().getWord()+"\" is missing."));
+		boolean notInDictionnary = babLaInput.contains("\""+tq.getWord().getWord()+"\" is currently not in our dictionary.");
 		
 		String nameForm = null;
-		switch (lw.getCode()) {
+		switch (tq.getWord().getCode()) {
 		case SV: nameForm = "English"; break;
 		case EN: nameForm = "Swedish"; break;
 		default:
-			throw new IllegalArgumentException("Unexpected value: " + lw.getCode());
+			throw new IllegalArgumentException("Unexpected value: " + tq.getWord().getCode());
 		}
-		boolean inRightForm = babLaInput.toLowerCase().contains("\""+lw.getWord().toLowerCase()+"\" in "+nameForm.toLowerCase());
+		boolean inRightForm = babLaInput.toLowerCase().contains("\""+tq.getWord().getWord().toLowerCase()+"\" in "+nameForm.toLowerCase());
 		
 		boolean res = !missing && !notInDictionnary && inRightForm; 
 		
 		if(!res)
-			wordsWithoutEntryInBabla.add(lw);
+			wordsWithoutEntryInBabla.add(tq);
 		
 		return res;
 	}
 
-	public static Set<ResultOfTranslationAttempt> getBabLaTranslationDescriptions(LanguageWord lw)
+	public static Set<ResultOfTranslationAttempt> getBabLaTranslationDescriptions(TranslationQuery tq)
 	{
-		if(!isWordTranslatedByBabLa(lw))
+		if(!isWordTranslatedByBabLa(tq))
 			return new HashSet<>();
-		if(babLaPrecomputedTranslations.has(lw))
-			return babLaPrecomputedTranslations.get(lw);
-		AttemptOutcome<Set<String>> outcome = WebScrapping.getContentsFrom(lw, DataBaseEnum.BAB_LA);
+		if(babLaPrecomputedTranslations.has(tq))
+			return babLaPrecomputedTranslations.get(tq);
+		AttemptOutcome<Set<String>> outcome = WebScrapping.getContentsFrom(tq, DataBaseEnum.BAB_LA);
 		
 		Set<String> resO = ((SuccessfulOutcome<Set<String>>)outcome).getResult();
 		if(resO.size()!=1) throw new Error();
@@ -127,13 +126,13 @@ public class BabLaProcessing {
 		
 		babLaInput = reduced;
 		
-		String headerToLookFor="<h2 class=\"h1\">\""+lw.getWord()+"\" in ";
+		String headerToLookFor="<h2 class=\"h1\">\""+tq.getWord()+"\" in ";
 		if(!babLaInput.contains(headerToLookFor))
 			return new HashSet<>();
 		
-		LanguageCode to = LanguageCode.otherLanguage(lw.getCode());
+		LanguageCode to = LanguageCode.otherLanguage(tq.getCode());
 	
-		List<String> definitions = WordDescription.getBabLaDefinitionsFrom(lw,babLaInput); 
+		List<String> definitions = WordDescription.getBabLaDefinitionsFrom(tq,babLaInput); 
 		
 		 Set<ResultOfTranslationAttempt> res = definitions
 					.stream().map(
@@ -142,9 +141,9 @@ public class BabLaProcessing {
 									WordType.UNDEFINED, ResultOfTranslationAttempt.Origin.BAB_LA)).collect(Collectors.toSet()); 
 		 
 		 if(res.isEmpty())
-			 wordsWithoutEntryInBabla.add(lw);
+			 wordsWithoutEntryInBabla.add(tq);
 		 else
-			 babLaPrecomputedTranslations.add(lw, res);
+			 babLaPrecomputedTranslations.add(tq, res);
 		return res;
 	}
 

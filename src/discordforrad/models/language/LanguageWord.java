@@ -62,11 +62,15 @@ public class LanguageWord implements Serializable{
 	}
 
 	private static final Map<LanguageCode,Map<String, LanguageWord>> cache = new HashMap<>();
-	public static LanguageWord newInstance(String s, LanguageCode languageCode) {
-		s = s.replaceAll("-", "").trim();
-		if(cache.containsKey(languageCode)&&cache.get(languageCode).containsKey(s))
-			return cache.get(languageCode).get(s);
-		return new LanguageWord(languageCode, s.toLowerCase());
+	public static synchronized LanguageWord newInstance(String s, LanguageCode languageCode) {
+		s = s.replaceAll("-", "").trim().toLowerCase();
+		synchronized (cache) {
+
+
+			if(cache.containsKey(languageCode)&&cache.get(languageCode).containsKey(s))
+				return cache.get(languageCode).get(s);
+		}
+		return new LanguageWord(languageCode, s);
 	}
 
 	public static Set<LanguageWord> toLanguageWordSet(Set<String> strings) {

@@ -1,16 +1,12 @@
 package discordforrad.models.language;
 
-import java.awt.JobAttributes;
 import java.io.File;
 import java.io.Serializable;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -19,19 +15,14 @@ import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
-import cachingutils.impl.PlainObjectFileBasedCache;
 import cachingutils.impl.TextFileBasedCache;
 import discordforrad.Main;
-import discordforrad.inputUtils.WebScrapping;
 import discordforrad.inputUtils.WebScrapping.DataBaseEnum;
 import discordforrad.inputUtils.databases.BabLaProcessing;
-import discordforrad.models.language.WordDescription.WordType;
 import discordforrad.models.language.wordnetwork.forms.RelatedForms;
 import discordforrad.models.language.wordnetwork.forms.RelatedFormsNetwork;
 import discordforrad.models.language.wordnetwork.forms.RelatedFormsTransition;
 import discordforrad.translation.ResultOfTranslationAttempt;
-import discordforrad.translation.Translator;
-import net.dv8tion.jda.api.entities.TextChannel;
 
 public class WordDescription implements Serializable {
 	private static final File cacheFile = Paths.get(Main.ROOT_DATABASE+"caches/word_description_cache.txt").toFile();
